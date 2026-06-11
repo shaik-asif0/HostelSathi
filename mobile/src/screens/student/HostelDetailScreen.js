@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, Image, TouchableOpacity,
-  TextInput, ActivityIndicator, Alert, SafeAreaView, Modal, FlatList, Dimensions, Linking
+  TextInput, ActivityIndicator, Alert, SafeAreaView, Modal, Dimensions, Linking
 } from 'react-native';
+import { launchImageLibrary } from 'react-native-image-picker';
 import { useSelector } from 'react-redux';
-import { hostelsAPI, reviewsAPI, enquiriesAPI } from '../../api/apiClient';
+import { hostelsAPI, reviewsAPI, enquiriesAPI, paymentsAPI, tenantsAPI } from '../../api/apiClient';
 
 const PHYSICAL_SERVER_IP = '192.168.1.37';
 const SCREEN_WIDTH = Dimensions.get('window').width;
@@ -39,6 +40,21 @@ export default function HostelDetailScreen({ route, navigation }) {
   const [enquiryMessage, setEnquiryMessage] = useState('');
   const [enquirySubmitting, setEnquirySubmitting] = useState(false);
   const [enquirySuccess, setEnquirySuccess] = useState(false);
+
+  // Monetization states
+  const [localUnlocked, setLocalUnlocked] = useState(false);
+  const [paymentModalVisible, setPaymentModalVisible] = useState(false);
+  const [paymentStep, setPaymentStep] = useState('initial'); // 'initial' or 'qr'
+  const [processingPayment, setProcessingPayment] = useState(false);
+
+  // Tenant states
+  const [joinModalVisible, setJoinModalVisible] = useState(false);
+  const [joinStep, setJoinStep] = useState('initial'); // 'initial', 'qr'
+  const [processingJoin, setProcessingJoin] = useState(false);
+
+  useEffect(() => {
+    setLocalUnlocked(user?.role === 'owner' || (user?.unlockedHostels && user.unlockedHostels.includes(hostelId)));
+  }, [user, hostelId]);
 
   // New: Move-in date & room type
   const [moveInDate, setMoveInDate] = useState(null);
@@ -142,6 +158,102 @@ export default function HostelDetailScreen({ route, navigation }) {
     });
   };
 
+  const requireUnlock = (actionFn) => {
+    if (localUnlocked) return actionFn();
+    setPaymentModalVisible(true);
+    setPaymentStep('initial');
+  };
+
+  const handleInitialPayClick = () => {
+    if (!isAuthenticated) {
+      setPaymentModalVisible(false);
+      return Alert.alert('Login Required', 'Please log in to unlock contact info.');
+    }
+    setPaymentStep('qr');
+  };
+
+  const handleUploadScreenshot = async () => {
+    try {
+      const result = await launchImageLibrary({
+        mediaType: 'photo',
+        quality: 0.8
+      });
+
+      if (result.didCancel || !result.assets || result.assets.length === 0) return;
+
+      const asset = result.assets[0];
+      setProcessingPayment(true);
+
+      const formData = new FormData();
+      formData.append('hostelId', hostelId);
+      formData.append('screenshot', {
+        uri: asset.uri,
+        type: asset.type || 'image/jpeg',
+        name: asset.fileName || 'screenshot.jpg'
+      });
+
+      const res = await paymentsAPI.verifyScreenshot(formData);
+      if (res.data.success) {
+        Alert.alert('✅ Verification Successful', 'You have unlocked all owner details for this hostel!');
+        setPaymentModalVisible(false);
+        setPaymentStep('initial');
+        setLocalUnlocked(true);
+        // Also update redux state or refetch user if needed, but localUnlocked handles UI
+      }
+    } catch (err) {
+      console.error(err);
+      Alert.alert('Verification Failed', err.response?.data?.error || 'Could not verify your screenshot. Please try again.');
+    } finally {
+      setProcessingPayment(false);
+    }
+  };
+
+  const handleUploadJoinScreenshot = async () => {
+    try {
+      const result = await launchImageLibrary({
+        mediaType: 'photo',
+        quality: 0.8,
+      });
+
+      if (result.didCancel || !result.assets || result.assets.length === 0) return;
+
+      const photo = result.assets[0];
+
+      setProcessingJoin(true);
+
+      const formData = new FormData();
+      formData.append('screenshot', {
+        uri: photo.uri,
+        name: photo.fileName || 'rent_screenshot.jpg',
+        type: photo.type || 'image/jpeg'
+      });
+      formData.append('hostelId', hostel._id);
+      
+      // Determine Rent Amount based on selectedRoomType
+      let rentAmt = 0;
+      if (selectedRoomType === 'single' || selectedRoomType === 'Single Room') rentAmt = hostel.rent.single;
+      else if (selectedRoomType === 'sharing2' || selectedRoomType === '2-Sharing') rentAmt = hostel.rent.sharing2;
+      else if (selectedRoomType === 'sharing3' || selectedRoomType === '3-Sharing') rentAmt = hostel.rent.sharing3;
+      else rentAmt = hostel.rent.single || hostel.rent.sharing2 || hostel.rent.sharing3; // fallback
+
+      formData.append('roomType', selectedRoomType === 'any' ? 'Single Room' : selectedRoomType);
+      formData.append('rentAmount', rentAmt);
+
+      const res = await tenantsAPI.joinHostel(formData);
+
+      if (res.data.success) {
+        Alert.alert('🎉 Welcome!', 'Your rent payment was verified and you have joined the hostel!');
+        setJoinModalVisible(false);
+        setJoinStep('initial');
+      }
+    } catch (err) {
+      console.error(err);
+      Alert.alert('Verification Failed', err.response?.data?.error || 'Could not verify your rent payment screenshot. Please ensure the 12-digit UTR is clearly visible.');
+    } finally {
+      setProcessingJoin(false);
+    }
+  };
+
   // ✅ Open location in Google Maps
   const handleOpenMap = () => {
     if (!hostel?.location?.coordinates) {
@@ -165,10 +277,6 @@ export default function HostelDetailScreen({ route, navigation }) {
 
   const handleWhatsAppOwner = () => {
     if (!hostel) return;
-    if (!enquirySuccess) {
-      Alert.alert('Submit Enquiry First', 'Please submit an enquiry to unlock owner contact.');
-      return;
-    }
     const msg = encodeURIComponent(`Hi ${hostel.ownerName} garu! I saw your PG "${hostel.name}" on HostelSathi. I am interested in visiting. Please let me know a convenient time.`);
     Linking.openURL(`https://wa.me/91${hostel.phone}?text=${msg}`)
       .catch(() => Alert.alert('WhatsApp not installed'));
@@ -343,54 +451,105 @@ export default function HostelDetailScreen({ route, navigation }) {
 
           {/* Quick Action Buttons */}
           <View style={styles.actionBtns}>
-            <TouchableOpacity style={styles.actionBtnChat} onPress={handleChatPress}>
-              <Text style={styles.actionBtnChatText}>💬 Chat with Owner</Text>
+            <TouchableOpacity style={styles.actionBtnChat} onPress={() => requireUnlock(handleChatPress)}>
+              <Text style={styles.actionBtnChatText}>{localUnlocked ? '💬 Chat' : '🔒 Chat'}</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.actionBtnMap} onPress={handleOpenMap}>
-              <Text style={styles.actionBtnMapText}>🗺 Map</Text>
+            <TouchableOpacity style={styles.actionBtnMap} onPress={() => requireUnlock(handleOpenMap)}>
+              <Text style={styles.actionBtnMapText}>{localUnlocked ? '🗺 Map' : '🔒 Map'}</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.actionBtnCall}
-              onPress={() => {
-                if (enquirySuccess) {
-                  Linking.openURL(`tel:${hostel.phone}`);
-                } else {
-                  Alert.alert('Unlock First', 'Submit an enquiry to unlock the owner\'s contact number.');
-                }
-              }}
+              onPress={() => requireUnlock(() => Linking.openURL(`tel:${hostel.phone}`))}
             >
-              <Text style={styles.actionBtnCallText}>📞 Call</Text>
+              <Text style={styles.actionBtnCallText}>{localUnlocked ? '📞 Call' : '🔒 Call'}</Text>
             </TouchableOpacity>
           </View>
 
           {/* WhatsApp Row */}
-          <TouchableOpacity style={styles.whatsappBtn} onPress={handleWhatsAppOwner}>
-            <Text style={styles.whatsappBtnText}>💬 WhatsApp Owner (Unlock required)</Text>
+          <TouchableOpacity style={styles.whatsappBtn} onPress={() => requireUnlock(handleWhatsAppOwner)}>
+            <Text style={styles.whatsappBtnText}>{localUnlocked ? '💬 WhatsApp Owner' : '🔒 WhatsApp Owner (Pay ₹5 to Unlock)'}</Text>
           </TouchableOpacity>
 
-          {/* Pricing Grid */}
+          {hostel.paymentUpiId && (
+            <TouchableOpacity 
+              style={[styles.btnBook, { backgroundColor: '#10b981', marginTop: 16 }]} 
+              onPress={() => {
+                if (!isAuthenticated) {
+                  Alert.alert('Login Required', 'Please log in to join hostel');
+                  return;
+                }
+                if (user?.role !== 'student') {
+                  Alert.alert('Error', 'Only students can join hostels');
+                  return;
+                }
+                setJoinModalVisible(true);
+              }}
+            >
+              <Text style={styles.btnBookText}>🎉 Join Hostel & Pay Rent Direct</Text>
+            </TouchableOpacity>
+          )}
+
+          {/* Premium Room Pricing */}
           <Text style={styles.sectionTitle}>🏷️ Room Pricing</Text>
-          <View style={styles.priceGrid}>
+          <View style={styles.pricingList}>
             {[
-              { label: 'Single Room', val: hostel.rent.single, vacancies: hostel.availability?.singleVacancy },
-              { label: '2-Sharing', val: hostel.rent.sharing2, vacancies: hostel.availability?.sharing2Vacancy },
-              { label: '3-Sharing', val: hostel.rent.sharing3, vacancies: hostel.availability?.sharing3Vacancy },
-              { label: '4-Sharing', val: hostel.rent.sharing4, vacancies: hostel.availability?.sharing4Vacancy },
-              { label: '5-Sharing', val: hostel.rent.sharing5, vacancies: hostel.availability?.sharing5Vacancy }
-            ].map(p => (
-              <View key={p.label} style={[styles.priceCard, p.val > 0 && styles.priceCardActive]}>
-                <Text style={styles.priceLabel}>{p.label}</Text>
-                <Text style={styles.priceVal}>
-                  {p.val > 0 ? `₹${p.val.toLocaleString('en-IN')}` : 'N/A'}
-                </Text>
-                {p.vacancies !== undefined && p.vacancies >= 0 && p.val > 0 && (
-                  <Text style={styles.vacancyText}>
-                    {p.vacancies > 0 ? `${p.vacancies} available` : 'Full'}
-                  </Text>
-                )}
-              </View>
+              { label: 'Single Room', icon: '🛏️', val: hostel.rent.single, vacancies: hostel.availability?.singleVacancy },
+              { label: '2-Sharing', icon: '🛏️🛏️', val: hostel.rent.sharing2, vacancies: hostel.availability?.sharing2Vacancy },
+              { label: '3-Sharing', icon: '🛏️🛏️🛏️', val: hostel.rent.sharing3, vacancies: hostel.availability?.sharing3Vacancy },
+              { label: '4-Sharing', icon: '🛏️x4', val: hostel.rent.sharing4, vacancies: hostel.availability?.sharing4Vacancy },
+              { label: '5-Sharing', icon: '🛏️x5', val: hostel.rent.sharing5, vacancies: hostel.availability?.sharing5Vacancy }
+            ].filter(p => p.val > 0).map(p => (
+              <TouchableOpacity 
+                key={p.label} 
+                style={[styles.premiumPriceCard, selectedRoomType === p.label && styles.premiumPriceCardSelected]}
+                onPress={() => setSelectedRoomType(p.label)}
+                activeOpacity={0.8}
+              >
+                <View style={styles.premiumPriceTop}>
+                  <Text style={styles.premiumPriceIcon}>{p.icon}</Text>
+                  {p.vacancies !== undefined && (
+                    <View style={[styles.vacancyPill, p.vacancies > 0 ? styles.vacancyPillAvailable : styles.vacancyPillFull]}>
+                      <Text style={[styles.vacancyPillText, p.vacancies > 0 ? styles.vacancyPillTextAvailable : styles.vacancyPillTextFull]}>
+                        {p.vacancies > 0 ? `${p.vacancies} Left` : 'Full'}
+                      </Text>
+                    </View>
+                  )}
+                </View>
+                <Text style={styles.premiumPriceLabel} numberOfLines={1} adjustsFontSizeToFit>{p.label}</Text>
+                <View style={styles.premiumPriceBottom}>
+                  <Text style={styles.premiumPriceVal} numberOfLines={1} adjustsFontSizeToFit>₹{p.val.toLocaleString('en-IN')}</Text>
+                  <Text style={styles.premiumPriceUnit}>/mo</Text>
+                </View>
+              </TouchableOpacity>
             ))}
           </View>
+
+          {/* Financials & Fees */}
+          {(hostel.fees?.depositAmount > 0 || hostel.fees?.maintenanceFee > 0 || hostel.fees?.noticePeriodDays > 0) && (
+            <>
+              <Text style={styles.sectionTitle}>💰 Financials & Fees</Text>
+              <View style={styles.feesCard}>
+                <View style={styles.feeRow}>
+                  <Text style={styles.feeLabel}>Security Deposit</Text>
+                  <Text style={styles.feeVal}>
+                    {hostel.fees.depositAmount > 0 ? `₹${hostel.fees.depositAmount.toLocaleString('en-IN')}` : 'None'}
+                  </Text>
+                </View>
+                <View style={styles.feeRow}>
+                  <Text style={styles.feeLabel}>Maintenance Fee (per month)</Text>
+                  <Text style={styles.feeVal}>
+                    {hostel.fees.maintenanceFee > 0 ? `₹${hostel.fees.maintenanceFee.toLocaleString('en-IN')}` : 'Included'}
+                  </Text>
+                </View>
+                <View style={styles.feeRow}>
+                  <Text style={styles.feeLabel}>Notice Period</Text>
+                  <Text style={styles.feeVal}>
+                    {hostel.fees.noticePeriodDays > 0 ? `${hostel.fees.noticePeriodDays} Days` : 'N/A'}
+                  </Text>
+                </View>
+              </View>
+            </>
+          )}
 
           {/* Distance Card */}
           <View style={styles.distanceCard}>
@@ -428,6 +587,49 @@ export default function HostelDetailScreen({ route, navigation }) {
                   </TouchableOpacity>
                 ))}
               </ScrollView>
+            </>
+          )}
+
+          {/* House Rules */}
+          {hostel.rules && (
+            <>
+              <Text style={styles.sectionTitle}>📜 House Rules & Policies</Text>
+              <View style={styles.rulesGrid}>
+                <View style={styles.ruleItem}>
+                  <Text style={styles.ruleIcon}>🕒</Text>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.ruleLabel}>Curfew Time</Text>
+                    <Text style={styles.ruleVal} numberOfLines={1}>{hostel.rules.curfewTime || 'No curfew'}</Text>
+                  </View>
+                </View>
+                <View style={styles.ruleItem}>
+                  <Text style={styles.ruleIcon}>{hostel.rules.visitorsAllowed ? '✅' : '🚫'}</Text>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.ruleLabel}>Visitors</Text>
+                    <Text style={[styles.ruleVal, !hostel.rules.visitorsAllowed && styles.ruleValDisabled]} numberOfLines={1}>
+                      {hostel.rules.visitorsAllowed ? 'Allowed' : 'Not Allowed'}
+                    </Text>
+                  </View>
+                </View>
+                <View style={styles.ruleItem}>
+                  <Text style={styles.ruleIcon}>{hostel.rules.smokingAllowed ? '🚬' : '🚭'}</Text>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.ruleLabel}>Smoking</Text>
+                    <Text style={[styles.ruleVal, !hostel.rules.smokingAllowed && styles.ruleValDisabled]} numberOfLines={1}>
+                      {hostel.rules.smokingAllowed ? 'Allowed' : 'Not Allowed'}
+                    </Text>
+                  </View>
+                </View>
+                <View style={styles.ruleItem}>
+                  <Text style={styles.ruleIcon}>{hostel.rules.drinkingAllowed ? '🍻' : '🚱'}</Text>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.ruleLabel}>Drinking</Text>
+                    <Text style={[styles.ruleVal, !hostel.rules.drinkingAllowed && styles.ruleValDisabled]} numberOfLines={1}>
+                      {hostel.rules.drinkingAllowed ? 'Allowed' : 'Not Allowed'}
+                    </Text>
+                  </View>
+                </View>
+              </View>
             </>
           )}
 
@@ -505,12 +707,12 @@ export default function HostelDetailScreen({ route, navigation }) {
 
                 <TouchableOpacity
                   style={styles.btnBook}
-                  onPress={handleEnquirySubmit}
+                  onPress={() => requireUnlock(handleEnquirySubmit)}
                   disabled={enquirySubmitting}
                 >
                   {enquirySubmitting
                     ? <ActivityIndicator color="#fff" />
-                    : <Text style={styles.btnBookText}>🔓 Unlock Owner Details & Submit</Text>
+                    : <Text style={styles.btnBookText}>{localUnlocked ? '✅ Submit Visit Request' : '🔒 Pay ₹5 to Unlock & Submit'}</Text>
                   }
                 </TouchableOpacity>
               </View>
@@ -605,6 +807,69 @@ export default function HostelDetailScreen({ route, navigation }) {
         </View>
       </Modal>
 
+      {/* Payment Paywall Modal */}
+      <Modal 
+        visible={paymentModalVisible} 
+        transparent 
+        animationType="slide"
+        onRequestClose={() => {
+          if (!processingPayment) {
+            setPaymentModalVisible(false);
+            setPaymentStep('initial');
+          }
+        }}
+      >
+        <View style={styles.paymentModalOverlay}>
+          <View style={styles.paymentModal}>
+            {paymentStep === 'initial' ? (
+              <>
+                <Text style={styles.paymentModalIcon}>💳</Text>
+                <Text style={styles.paymentModalTitle}>Unlock Contact Details</Text>
+                <Text style={styles.paymentModalDesc}>
+                  Pay just <Text style={{fontWeight:'bold',color:'#7c3aed'}}>₹5</Text> to instantly unlock the owner's phone number, WhatsApp, Map location, and Chat feature.
+                </Text>
+                <View style={styles.paymentActionRow}>
+                  <TouchableOpacity style={styles.payBtn} onPress={handleInitialPayClick}>
+                    <Text style={styles.payBtnText}>Pay ₹5</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={styles.payCancelBtn} onPress={() => { setPaymentModalVisible(false); setPaymentStep('initial'); }}>
+                    <Text style={styles.payCancelText}>Cancel</Text>
+                  </TouchableOpacity>
+                </View>
+              </>
+            ) : (
+              <>
+                <Text style={styles.paymentModalTitle}>Scan to Unlock</Text>
+                <Text style={styles.paymentModalDesc}>
+                  Scan and pay exactly <Text style={{fontWeight:'bold',color:'#7c3aed'}}>₹5.00</Text>. Then upload the payment success screenshot.
+                </Text>
+                
+                <Image 
+                  source={{ uri: `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent('upi://pay?pa=hostelsathi@ybl&pn=HostelSathi&am=5.00&cu=INR')}` }}
+                  style={styles.qrCodeImage}
+                />
+
+                {processingPayment ? (
+                  <View style={styles.paymentProcessing}>
+                    <ActivityIndicator size="large" color="#7c3aed" />
+                    <Text style={styles.paymentProcessingText}>AI is verifying your screenshot...</Text>
+                  </View>
+                ) : (
+                  <View style={styles.paymentActionRow}>
+                    <TouchableOpacity style={styles.uploadBtn} onPress={handleUploadScreenshot}>
+                      <Text style={styles.payBtnText}>Upload Screenshot</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.payCancelBtn} onPress={() => { setPaymentModalVisible(false); setPaymentStep('initial'); }}>
+                      <Text style={styles.payCancelText}>Cancel</Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
+              </>
+            )}
+          </View>
+        </View>
+      </Modal>
+
       {/* Date Picker Modal */}
       <Modal visible={datePickerVisible} transparent animationType="slide">
         <View style={styles.dateModalOverlay}>
@@ -649,6 +914,66 @@ export default function HostelDetailScreen({ route, navigation }) {
           </View>
         </View>
       </Modal>
+
+      {/* Join & Pay Rent Modal */}
+      <Modal 
+        visible={joinModalVisible} 
+        transparent 
+        animationType="slide"
+        onRequestClose={() => {
+          if (!processingJoin) {
+            setJoinModalVisible(false);
+            setJoinStep('initial');
+          }
+        }}
+      >
+        <View style={styles.paymentModalOverlay}>
+          <View style={styles.paymentModal}>
+            {processingJoin ? (
+              <View style={styles.paymentProcessing}>
+                <ActivityIndicator size="large" color="#10b981" />
+                <Text style={[styles.paymentProcessingText, { color: '#10b981' }]}>Verifying rent payment with AI...</Text>
+              </View>
+            ) : joinStep === 'initial' ? (
+              <>
+                <Text style={styles.paymentModalIcon}>🏠</Text>
+                <Text style={styles.paymentModalTitle}>Join {hostel?.name}</Text>
+                <Text style={styles.paymentModalDesc}>
+                  Secure your room by paying the rent directly to the owner via UPI. We will automatically verify your payment!
+                </Text>
+                <View style={styles.paymentActionRow}>
+                  <TouchableOpacity style={[styles.payBtn, { backgroundColor: '#10b981' }]} onPress={() => setJoinStep('qr')}>
+                    <Text style={styles.payBtnText}>Proceed to Pay Rent</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={styles.payCancelBtn} onPress={() => setJoinModalVisible(false)}>
+                    <Text style={styles.payCancelText}>Cancel</Text>
+                  </TouchableOpacity>
+                </View>
+              </>
+            ) : (
+              <>
+                <Text style={[styles.paymentModalTitle, { fontSize: 18, marginBottom: 5 }]}>Owner's UPI QR Code</Text>
+                <Text style={[styles.paymentModalDesc, { marginBottom: 15 }]}>
+                  Scan this code to pay the rent to: {hostel?.paymentUpiId}
+                </Text>
+                <Image 
+                  source={{ uri: `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=upi://pay?pa=${hostel?.paymentUpiId}&pn=${hostel?.ownerName}&cu=INR` }} 
+                  style={styles.qrCodeImage} 
+                />
+                <View style={styles.paymentActionRow}>
+                  <TouchableOpacity style={styles.uploadBtn} onPress={handleUploadJoinScreenshot}>
+                    <Text style={styles.payBtnText}>📸 Upload Success Screenshot</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={styles.payCancelBtn} onPress={() => setJoinStep('initial')}>
+                    <Text style={styles.payCancelText}>Go Back</Text>
+                  </TouchableOpacity>
+                </View>
+              </>
+            )}
+          </View>
+        </View>
+      </Modal>
+
     </SafeAreaView>
   );
 }
@@ -781,23 +1106,93 @@ const styles = StyleSheet.create({
   },
   whatsappBtnText: { color: '#15803d', fontWeight: 'bold', fontSize: 13 },
   sectionTitle: { fontSize: 16, fontWeight: 'bold', color: '#1e1b29', marginTop: 20, marginBottom: 12 },
-  priceGrid: { flexDirection: 'row', gap: 8, marginBottom: 16 },
-  priceCard: {
-    flex: 1,
-    backgroundColor: '#f8f6fc',
-    borderRadius: 12,
-    padding: 12,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(124,58,237,0.08)'
+  
+  // Premium Pricing Cards
+  pricingList: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, justifyContent: 'space-between', marginBottom: 16 },
+  premiumPriceCard: {
+    width: '48%',
+    backgroundColor: '#ffffff',
+    borderRadius: 16,
+    padding: 14,
+    borderWidth: 2,
+    borderColor: 'rgba(124,58,237,0.06)',
+    shadowColor: '#7c3aed',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 8,
+    elevation: 2,
+    marginBottom: 4
   },
-  priceCardActive: { borderColor: 'rgba(124,58,237,0.2)', backgroundColor: 'rgba(124,58,237,0.02)' },
-  priceLabel: { fontSize: 11, color: '#8b85a3', textAlign: 'center', marginBottom: 4 },
-  priceVal: { fontSize: 15, fontWeight: 'bold', color: '#7c3aed' },
-  vacancyText: { fontSize: 10, color: '#10b981', fontWeight: '600', marginTop: 3 },
+  premiumPriceCardSelected: { borderColor: '#7c3aed', backgroundColor: '#faf8ff' },
+  premiumPriceTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 },
+  premiumPriceIcon: { fontSize: 20 },
+  premiumPriceLabel: { fontSize: 13, fontWeight: 'bold', color: '#1e1b29', marginBottom: 4 },
+  vacancyPill: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 8 },
+  vacancyPillAvailable: { backgroundColor: '#d1fae5' },
+  vacancyPillFull: { backgroundColor: '#fee2e2' },
+  vacancyPillText: { fontSize: 9, fontWeight: 'bold' },
+  vacancyPillTextAvailable: { color: '#059669' },
+  vacancyPillTextFull: { color: '#dc2626' },
+  premiumPriceBottom: { flexDirection: 'row', alignItems: 'flex-end', gap: 2 },
+  premiumPriceVal: { fontSize: 16, fontWeight: '900', color: '#7c3aed' },
+  premiumPriceUnit: { fontSize: 11, color: '#8b85a3', marginBottom: 2 },
+
   distanceCard: {
     backgroundColor: 'rgba(124,58,237,0.03)',
     borderWidth: 1,
+    borderColor: 'rgba(124,58,237,0.1)',
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 16
+  },
+  distanceTitle: { fontSize: 14, fontWeight: 'bold', color: '#1e1b29', marginBottom: 4 },
+  distanceKm: { fontSize: 12, color: '#8b85a3', marginBottom: 12 },
+  distanceRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  distanceItem: { alignItems: 'center', flex: 1 },
+  distanceIcon: { fontSize: 20, marginBottom: 4 },
+  distanceName: { fontSize: 11, color: '#5f5a75', fontWeight: '600' },
+  distanceDuration: { fontSize: 10, color: '#a09abc', marginTop: 2 },
+  distanceDivider: { width: 1, height: 30, backgroundColor: 'rgba(124,58,237,0.1)' },
+  amenitiesGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 20 },
+  amenityPill: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#f8f6fc', paddingVertical: 8, paddingHorizontal: 12, borderRadius: 8, borderWidth: 1, borderColor: 'rgba(124,58,237,0.08)' },
+  amenityCheck: { color: '#10b981', fontWeight: 'bold', fontSize: 12 },
+  amenityText: { fontSize: 12, color: '#1e1b29', fontWeight: '500' },
+  noDataText: { fontSize: 13, color: '#8b85a3', fontStyle: 'italic' },
+  // Fees
+  feesCard: {
+    backgroundColor: '#faf8ff',
+    borderRadius: 12,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(124,58,237,0.1)',
+    marginBottom: 16
+  },
+  feeRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 },
+  feeLabel: { fontSize: 13, color: '#5f5a75' },
+  feeVal: { fontSize: 14, fontWeight: 'bold', color: '#1e1b29' },
+  // Rules
+  rulesGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+    marginBottom: 16
+  },
+  ruleItem: {
+    width: '48%',
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#ffffff',
+    borderRadius: 12,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(124,58,237,0.08)',
+    gap: 10
+  },
+  ruleIcon: { fontSize: 20 },
+  ruleLabel: { fontSize: 11, color: '#8b85a3' },
+  ruleVal: { fontSize: 13, fontWeight: 'bold', color: '#1e1b29' },
+  ruleValDisabled: { color: '#ef4444' },
+  bookingBox: {
     borderColor: 'rgba(124,58,237,0.15)',
     borderRadius: 14,
     padding: 16,
@@ -1007,5 +1402,21 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: 'rgba(124,58,237,0.1)'
   },
-  dateModalCloseText: { color: '#ef4444', fontWeight: 'bold', fontSize: 14 }
+  dateModalCloseText: { color: '#ef4444', fontWeight: 'bold', fontSize: 14 },
+  
+  // Payment Modal
+  paymentModalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' },
+  paymentModal: { backgroundColor: '#ffffff', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, alignItems: 'center' },
+  paymentModalIcon: { fontSize: 48, marginBottom: 16 },
+  paymentModalTitle: { fontSize: 20, fontWeight: '900', color: '#1e1b29', marginBottom: 10 },
+  paymentModalDesc: { fontSize: 14, color: '#5f5a75', textAlign: 'center', lineHeight: 22, marginBottom: 20, paddingHorizontal: 10 },
+  paymentProcessing: { alignItems: 'center', paddingVertical: 20 },
+  paymentProcessingText: { fontSize: 14, color: '#7c3aed', fontWeight: '600', marginTop: 12 },
+  paymentActionRow: { width: '100%', gap: 12 },
+  payBtn: { backgroundColor: '#7c3aed', paddingVertical: 14, borderRadius: 12, alignItems: 'center', width: '100%' },
+  payBtnText: { color: '#ffffff', fontSize: 15, fontWeight: 'bold' },
+  uploadBtn: { backgroundColor: '#10b981', paddingVertical: 14, borderRadius: 12, alignItems: 'center', width: '100%' },
+  payCancelBtn: { paddingVertical: 12, alignItems: 'center', width: '100%' },
+  payCancelText: { color: '#8b85a3', fontSize: 14, fontWeight: 'bold' },
+  qrCodeImage: { width: 160, height: 160, marginBottom: 20 }
 });

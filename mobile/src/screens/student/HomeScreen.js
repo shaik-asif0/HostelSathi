@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import {
-  View, Text, StyleSheet, FlatList, TouchableOpacity,
+  View, Text, StyleSheet, FlatList, TouchableOpacity, Image,
   ScrollView, TextInput, ActivityIndicator, StatusBar, RefreshControl
 } from 'react-native';
 import { useDispatch, useSelector } from 'react-redux';
@@ -82,7 +82,10 @@ export default function HomeScreen({ navigation }) {
     >
       {/* Card image area */}
       <View style={styles.cardImagePlaceholder}>
-        <Text style={styles.cardImageIcon}>🏠</Text>
+        <Image 
+          source={{ uri: (item.photos && item.photos.length > 0) ? item.photos[0] : 'https://images.unsplash.com/photo-1555854877-bab0e564b8d5?auto=format&fit=crop&w=500&q=80' }} 
+          style={styles.cardCoverImage} 
+        />
         {item.isPremium && <View style={styles.premiumBadge}><Text style={styles.premiumText}>PREMIUM</Text></View>}
         {item.isVerified && <View style={styles.verifiedBadge}><Text style={styles.verifiedText}>✓ Verified</Text></View>}
       </View>
@@ -122,7 +125,10 @@ export default function HomeScreen({ navigation }) {
     >
       <View style={styles.compactLeft}>
         <View style={styles.compactIcon}>
-          <Text style={{ fontSize: 20 }}>🏠</Text>
+          <Image 
+            source={{ uri: (item.photos && item.photos.length > 0) ? item.photos[0] : 'https://images.unsplash.com/photo-1555854877-bab0e564b8d5?auto=format&fit=crop&w=200&q=80' }} 
+            style={{ width: '100%', height: '100%', borderRadius: 12, resizeMode: 'cover' }} 
+          />
         </View>
       </View>
       <View style={styles.compactBody}>
@@ -182,23 +188,6 @@ export default function HomeScreen({ navigation }) {
             <Text style={styles.searchIcon}>🔍</Text>
             <Text style={styles.searchPlaceholder}>Search hostels, college, area...</Text>
           </TouchableOpacity>
-        </View>
-
-        {/* Quick Filters */}
-        <View style={styles.filterSection}>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterScroll}>
-            {QUICK_FILTERS.map(f => (
-              <TouchableOpacity
-                key={f.label}
-                style={[styles.filterPill, activeFilter === f.value && styles.filterPillActive]}
-                onPress={() => setActiveFilter(activeFilter === f.value ? null : f.value)}
-              >
-                <Text style={[styles.filterPillText, activeFilter === f.value && styles.filterPillTextActive]}>
-                  {f.label}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
         </View>
 
         {/* Stats Banner */}
@@ -487,6 +476,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     position: 'relative'
+  },
+  cardCoverImage: {
+    width: '100%',
+    height: '100%',
+    resizeMode: 'cover'
   },
   cardImageIcon: {
     fontSize: 40

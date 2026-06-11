@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   View, Text, StyleSheet, FlatList, TouchableOpacity,
-  ScrollView, SafeAreaView, ActivityIndicator, Alert, Modal, RefreshControl
+  ScrollView, SafeAreaView, ActivityIndicator, Alert, Modal, RefreshControl, TextInput
 } from 'react-native';
 import { useSelector } from 'react-redux';
 import apiClient from '../../api/apiClient';
@@ -17,6 +17,28 @@ export default function DashboardScreen({ navigation }) {
   const [analyticsMap, setAnalyticsMap] = useState({});
   const [selectedHostelAnalytics, setSelectedHostelAnalytics] = useState(null);
   const [analyticsModalVisible, setAnalyticsModalVisible] = useState(false);
+
+  // Quick Vacancy Update state
+  const [quickUpdateModalVisible, setQuickUpdateModalVisible] = useState(false);
+  const [selectedHostelForUpdate, setSelectedHostelForUpdate] = useState(null);
+  const [quickVacancies, setQuickVacancies] = useState({ single: '0', sharing2: '0', sharing3: '0' });
+  const [quickUpdating, setQuickUpdating] = useState(false);
+
+  // UPI state
+  const [upiModalVisible, setUpiModalVisible] = useState(false);
+  const [selectedHostelForUpi, setSelectedHostelForUpi] = useState(null);
+  const [upiId, setUpiId] = useState('');
+  const [updatingUpi, setUpdatingUpi] = useState(false);
+
+  // Tenants state
+  const [tenantsModalVisible, setTenantsModalVisible] = useState(false);
+  const [selectedHostelForTenants, setSelectedHostelForTenants] = useState(null);
+  const [tenants, setTenants] = useState([]);
+  const [loadingTenants, setLoadingTenants] = useState(false);
+
+  // Digital Receipt state
+  const [receiptModalVisible, setReceiptModalVisible] = useState(false);
+  const [selectedReceipt, setSelectedReceipt] = useState(null);
 
   // ✅ Fix Bug #10: Handle both user.id and user._id from MongoDB
   const userId = user?._id || user?.id;
@@ -67,6 +89,104 @@ export default function DashboardScreen({ navigation }) {
     } catch (err) {
       Alert.alert('Analytics Error', 'Failed to load analytics for this listing.');
     }
+  };
+
+  const openQuickUpdate = (hostel) => {
+    setSelectedHostelForUpdate(hostel);
+    setQuickVacancies({
+      single: hostel.availability?.singleVacancy?.toString() || '0',
+      sharing2: hostel.availability?.sharing2Vacancy?.toString() || '0',
+      sharing3: hostel.availability?.sharing3Vacancy?.toString() || '0'
+    });
+    setQuickUpdateModalVisible(true);
+  };
+
+  const handleQuickUpdateSubmit = async () => {
+    setQuickUpdating(true);
+    try {
+      const payload = {
+        singleVacancy: parseInt(quickVacancies.single) || 0,
+        sharing2Vacancy: parseInt(quickVacancies.sharing2) || 0,
+        sharing3Vacancy: parseInt(quickVacancies.sharing3) || 0,
+      };
+      const res = await apiClient.put(`/hostels/${selectedHostelForUpdate._id}`, payload);
+      if (res.data.success) {
+        setQuickUpdateModalVisible(false);
+        fetchDashboardData();
+      }
+    } catch (err) {
+      Alert.alert('Update Error', 'Failed to update vacancies.');
+    } finally {
+      setQuickUpdating(false);
+    }
+  };
+
+  const openUpiModal = (hostel) => {
+    setSelectedHostelForUpi(hostel);
+    setUpiId(hostel.paymentUpiId || '');
+    setUpiModalVisible(true);
+  };
+
+  const handleUpiSubmit = async () => {
+    setUpdatingUpi(true);
+    try {
+      const res = await apiClient.put(`/hostels/${selectedHostelForUpi._id}`, { paymentUpiId: upiId });
+      if (res.data.success) {
+        setUpiModalVisible(false);
+        fetchDashboardData();
+        Alert.alert('Success', 'Payment UPI ID updated.');
+      }
+    } catch (err) {
+      Alert.alert('Error', 'Failed to update UPI ID');
+    } finally {
+      setUpdatingUpi(false);
+    }
+  };
+
+  const openTenantsModal = async (hostel) => {
+    setSelectedHostelForTenants(hostel);
+    setTenantsModalVisible(true);
+    setLoadingTenants(true);
+    try {
+      const res = await apiClient.get(`/tenants/hostel/${hostel._id}`);
+      if (res.data.success) {
+        setTenants(res.data.tenants);
+      }
+    } catch (err) {
+      Alert.alert('Error', 'Failed to fetch tenants');
+    } finally {
+      setLoadingTenants(false);
+    }
+  };
+
+  const handleRemoveTenant = async (tenantId) => {
+    Alert.alert('Remove Student', 'Are you sure you want to permanently remove this student?', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Remove', style: 'destructive', onPress: async () => {
+          try {
+            const res = await apiClient.put(`/tenants/${tenantId}/remove`);
+            if (res.data.success) {
+              setTenants(prev => prev.filter(t => t._id !== tenantId));
+              Alert.alert('Success', 'Student removed.');
+            }
+          } catch (err) {
+            Alert.alert('Error', 'Failed to remove student');
+          }
+      }}
+    ]);
+  };
+
+  const handleWhatsAppReminder = (tenant) => {
+    const message = `Hello ${tenant.studentName}, this is a gentle reminder that your rent for ${selectedHostelForTenants?.name} is due. Please use the HostelSathi app to pay via my QR code. Thanks!`;
+    const url = `whatsapp://send?phone=${tenant.studentPhone}&text=${encodeURIComponent(message)}`;
+    Linking.openURL(url).catch(() => {
+      Alert.alert('Error', 'WhatsApp is not installed on your device.');
+    });
+  };
+
+  const handleShowReceipt = (tenant) => {
+    setSelectedReceipt(tenant);
+    setReceiptModalVisible(true);
   };
 
   const handleDelete = (id) => {
@@ -178,10 +298,16 @@ export default function DashboardScreen({ navigation }) {
       {/* Action Buttons */}
       <View style={styles.cardActionRow}>
         <TouchableOpacity
+          style={styles.actionBtnQuickUpdate}
+          onPress={() => openQuickUpdate(item)}
+        >
+          <Text style={styles.actionBtnQuickUpdateText}>🛏 Vacancies</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
           style={styles.actionBtnAnalytics}
           onPress={() => fetchHostelAnalytics(item)}
         >
-          <Text style={styles.actionBtnAnalyticsText}>📊 Analytics</Text>
+          <Text style={styles.actionBtnAnalyticsText}>📊 Stats</Text>
         </TouchableOpacity>
         <TouchableOpacity
           style={styles.actionBtnEdit}
@@ -189,11 +315,19 @@ export default function DashboardScreen({ navigation }) {
         >
           <Text style={styles.actionBtnEditText}>✏️ Edit</Text>
         </TouchableOpacity>
+      </View>
+      <View style={[styles.cardActionRow, { marginTop: 8 }]}>
         <TouchableOpacity
-          style={styles.actionBtnDelete}
-          onPress={() => handleDelete(item._id)}
+          style={[styles.actionBtnEdit, { flex: 1, backgroundColor: '#f0ecfd', borderColor: '#d8b4fe' }]}
+          onPress={() => openUpiModal(item)}
         >
-          <Text style={styles.actionBtnDeleteText}>🗑️</Text>
+          <Text style={[styles.actionBtnEditText, { color: '#7c3aed' }]}>💳 Set UPI</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.actionBtnEdit, { flex: 1, backgroundColor: '#dcfce7', borderColor: '#86efac' }]}
+          onPress={() => openTenantsModal(item)}
+        >
+          <Text style={[styles.actionBtnEditText, { color: '#16a34a' }]}>🧑‍🎓 Tenants</Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -209,41 +343,40 @@ export default function DashboardScreen({ navigation }) {
         }
       >
 
-        {/* Header */}
-        <View style={styles.header}>
-          <View>
-            <Text style={styles.welcomeText}>Welcome back,</Text>
-            <Text style={styles.ownerName}>{user?.name} Garu 🙏</Text>
+        {/* Premium Welcome Banner */}
+        <View style={styles.proHeaderBg}>
+          <View style={styles.header}>
+            <View>
+              <Text style={styles.welcomeText}>Welcome back,</Text>
+              <Text style={styles.ownerName}>{user?.name} Garu 🙏</Text>
+            </View>
+            <View style={styles.proBadge}>
+              <Text style={styles.proBadgeText}>PRO DASHBOARD</Text>
+            </View>
           </View>
-          <TouchableOpacity
-            style={styles.btnAdd}
-            onPress={() => navigation.navigate('AddHostel')}
-          >
-            <Text style={styles.btnAddText}>+ Add PG</Text>
-          </TouchableOpacity>
         </View>
 
-        {/* Summary Stats Grid */}
+        {/* Summary Stats Grid (Overlapping) */}
         <View style={styles.statsGrid}>
-          <View style={[styles.statCard, styles.statCardPurple]}>
-            <Text style={styles.statCardIcon}>🏠</Text>
+          <View style={[styles.statCard, styles.statCardGlass]}>
+            <View style={styles.statIconWrapperPurple}><Text style={styles.statCardIcon}>🏠</Text></View>
             <Text style={styles.statCardVal}>{hostels.length}</Text>
             <Text style={styles.statCardLabel}>Active Listings</Text>
           </View>
-          <View style={[styles.statCard, styles.statCardGreen]}>
-            <Text style={styles.statCardIcon}>📩</Text>
+          <View style={[styles.statCard, styles.statCardGlass]}>
+            <View style={styles.statIconWrapperGreen}><Text style={styles.statCardIcon}>📩</Text></View>
             <Text style={styles.statCardVal}>{leadsCount}</Text>
             <Text style={styles.statCardLabel}>Total Leads</Text>
           </View>
-          <View style={[styles.statCard, styles.statCardAmber]}>
-            <Text style={styles.statCardIcon}>👁️</Text>
+          <View style={[styles.statCard, styles.statCardGlass]}>
+            <View style={styles.statIconWrapperAmber}><Text style={styles.statCardIcon}>👁️</Text></View>
             <Text style={styles.statCardVal}>
               {hostels.reduce((s, h) => s + (h.viewCount || 0), 0)}
             </Text>
             <Text style={styles.statCardLabel}>Total Views</Text>
           </View>
-          <View style={[styles.statCard, styles.statCardBlue]}>
-            <Text style={styles.statCardIcon}>⭐</Text>
+          <View style={[styles.statCard, styles.statCardGlass]}>
+            <View style={styles.statIconWrapperBlue}><Text style={styles.statCardIcon}>⭐</Text></View>
             <Text style={styles.statCardVal}>
               {hostels.length > 0
                 ? (hostels.reduce((s, h) => s + (h.rating || 0), 0) / hostels.length).toFixed(1)
@@ -404,6 +537,211 @@ export default function DashboardScreen({ navigation }) {
           </View>
         </View>
       </Modal>
+
+      {/* Quick Update Vacancy Modal */}
+      <Modal
+        visible={quickUpdateModalVisible}
+        animationType="fade"
+        transparent
+        onRequestClose={() => setQuickUpdateModalVisible(false)}
+      >
+        <View style={styles.quickModalOverlay}>
+          <View style={styles.quickModalBox}>
+            <Text style={styles.quickModalTitle}>Quick Update Vacancies</Text>
+            {selectedHostelForUpdate && (
+              <Text style={styles.quickModalSub}>{selectedHostelForUpdate.name}</Text>
+            )}
+
+            <View style={styles.quickInputRow}>
+              <Text style={styles.quickInputLabel}>Single Room</Text>
+              <TextInput
+                style={styles.quickInput}
+                keyboardType="numeric"
+                value={quickVacancies.single}
+                onChangeText={(t) => setQuickVacancies(prev => ({ ...prev, single: t }))}
+              />
+            </View>
+            <View style={styles.quickInputRow}>
+              <Text style={styles.quickInputLabel}>2-Sharing</Text>
+              <TextInput
+                style={styles.quickInput}
+                keyboardType="numeric"
+                value={quickVacancies.sharing2}
+                onChangeText={(t) => setQuickVacancies(prev => ({ ...prev, sharing2: t }))}
+              />
+            </View>
+            <View style={styles.quickInputRow}>
+              <Text style={styles.quickInputLabel}>3-Sharing</Text>
+              <TextInput
+                style={styles.quickInput}
+                keyboardType="numeric"
+                value={quickVacancies.sharing3}
+                onChangeText={(t) => setQuickVacancies(prev => ({ ...prev, sharing3: t }))}
+              />
+            </View>
+
+            <View style={styles.quickActionRow}>
+              <TouchableOpacity
+                style={styles.quickCancelBtn}
+                onPress={() => setQuickUpdateModalVisible(false)}
+              >
+                <Text style={styles.quickCancelText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.quickSaveBtn}
+                onPress={handleQuickUpdateSubmit}
+                disabled={quickUpdating}
+              >
+                {quickUpdating ? (
+                  <ActivityIndicator color="#fff" size="small" />
+                ) : (
+                  <Text style={styles.quickSaveText}>Save Changes</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* UPI Update Modal */}
+      <Modal visible={upiModalVisible} transparent animationType="fade" onRequestClose={() => setUpiModalVisible(false)}>
+        <View style={styles.quickModalOverlay}>
+          <View style={styles.quickModalBox}>
+            <Text style={styles.quickModalTitle}>Set Payment UPI</Text>
+            <Text style={styles.quickModalSub}>Enter your UPI ID to let students pay rent directly.</Text>
+
+            <TextInput
+              style={[styles.quickInput, { width: '100%', textAlign: 'left', paddingHorizontal: 12 }]}
+              placeholder="e.g. yourname@okicici"
+              value={upiId}
+              onChangeText={setUpiId}
+              autoCapitalize="none"
+            />
+
+            <View style={styles.quickActionRow}>
+              <TouchableOpacity style={styles.quickCancelBtn} onPress={() => setUpiModalVisible(false)}>
+                <Text style={styles.quickCancelText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.quickSaveBtn} onPress={handleUpiSubmit} disabled={updatingUpi}>
+                {updatingUpi ? (
+                  <ActivityIndicator color="#fff" size="small" />
+                ) : (
+                  <Text style={styles.quickSaveText}>Save UPI</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Tenants Modal */}
+      <Modal visible={tenantsModalVisible} transparent animationType="slide" onRequestClose={() => setTenantsModalVisible(false)}>
+        <View style={styles.analyticsOverlay}>
+          <View style={[styles.analyticsSheet, { height: '80%' }]}>
+            <View style={styles.analyticsHandle} />
+            <Text style={styles.analyticsTitle}>Manage Students ({tenants.length})</Text>
+            
+            {loadingTenants ? (
+              <ActivityIndicator color="#7c3aed" size="large" style={{ marginTop: 40 }} />
+            ) : tenants.length === 0 ? (
+              <View style={styles.emptyBox}>
+                <Text style={styles.emptyIcon}>📭</Text>
+                <Text style={styles.emptyTitle}>No Students Yet</Text>
+                <Text style={styles.emptySub}>When students pay and join via the app, they will appear here.</Text>
+              </View>
+            ) : (
+              <FlatList
+                data={tenants}
+                keyExtractor={item => item._id}
+                contentContainerStyle={{ gap: 10, paddingBottom: 20 }}
+                renderItem={({ item }) => (
+                  <View style={{ backgroundColor: '#f8f6fc', borderRadius: 12, padding: 14, borderWidth: 1, borderColor: '#e5e0f8' }}>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 }}>
+                      <Text style={{ fontSize: 15, fontWeight: 'bold', color: '#1e1b29' }}>{item.studentName}</Text>
+                      <Text style={{ fontSize: 13, fontWeight: 'bold', color: '#7c3aed' }}>₹{item.rentPaid}</Text>
+                    </View>
+                    <Text style={{ fontSize: 13, color: '#5f5a75', marginBottom: 2 }}>📞 {item.studentPhone}</Text>
+                    <Text style={{ fontSize: 12, color: '#8b85a3', marginBottom: 12 }}>🛏️ {item.roomType} • Joined {new Date(item.joinDate).toLocaleDateString()}</Text>
+                    
+                    <View style={{ flexDirection: 'row', gap: 8 }}>
+                      <TouchableOpacity
+                        style={{ flex: 1, backgroundColor: '#dcfce7', paddingVertical: 8, borderRadius: 8, alignItems: 'center' }}
+                        onPress={() => handleWhatsAppReminder(item)}
+                      >
+                        <Text style={{ color: '#16a34a', fontWeight: 'bold', fontSize: 12 }}>🔔 Remind</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={{ flex: 1, backgroundColor: '#ede9fe', paddingVertical: 8, borderRadius: 8, alignItems: 'center' }}
+                        onPress={() => handleShowReceipt(item)}
+                      >
+                        <Text style={{ color: '#7c3aed', fontWeight: 'bold', fontSize: 12 }}>📄 Receipt</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={{ flex: 1, backgroundColor: '#fee2e2', paddingVertical: 8, borderRadius: 8, alignItems: 'center' }}
+                        onPress={() => handleRemoveTenant(item._id)}
+                      >
+                        <Text style={{ color: '#ef4444', fontWeight: 'bold', fontSize: 12 }}>Remove</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                )}
+              />
+            )}
+            
+            <TouchableOpacity style={styles.analyticsCloseBtn} onPress={() => setTenantsModalVisible(false)}>
+              <Text style={styles.analyticsCloseBtnText}>Close</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Digital Receipt Modal */}
+      <Modal visible={receiptModalVisible} transparent animationType="fade" onRequestClose={() => setReceiptModalVisible(false)}>
+        <View style={styles.quickModalOverlay}>
+          <View style={[styles.quickModalBox, { padding: 0, overflow: 'hidden' }]}>
+            <View style={{ backgroundColor: '#7c3aed', padding: 20, alignItems: 'center' }}>
+              <Text style={{ fontSize: 40 }}>🧾</Text>
+              <Text style={{ color: '#fff', fontSize: 18, fontWeight: 'bold', marginTop: 10 }}>Rent Receipt</Text>
+              <Text style={{ color: '#ddd6fe', fontSize: 12, marginTop: 4 }}>HostelSathi Verified Payment</Text>
+            </View>
+            
+            {selectedReceipt && (
+              <View style={{ padding: 20 }}>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 12, borderBottomWidth: 1, borderBottomColor: '#f1f1f1', paddingBottom: 12 }}>
+                  <Text style={{ color: '#8b85a3', fontSize: 13 }}>Student Name</Text>
+                  <Text style={{ color: '#1e1b29', fontSize: 14, fontWeight: 'bold' }}>{selectedReceipt.studentName}</Text>
+                </View>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 12, borderBottomWidth: 1, borderBottomColor: '#f1f1f1', paddingBottom: 12 }}>
+                  <Text style={{ color: '#8b85a3', fontSize: 13 }}>Amount Paid</Text>
+                  <Text style={{ color: '#10b981', fontSize: 16, fontWeight: 'bold' }}>₹{selectedReceipt.rentPaid}</Text>
+                </View>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 12, borderBottomWidth: 1, borderBottomColor: '#f1f1f1', paddingBottom: 12 }}>
+                  <Text style={{ color: '#8b85a3', fontSize: 13 }}>Date Joined</Text>
+                  <Text style={{ color: '#1e1b29', fontSize: 13, fontWeight: '600' }}>{new Date(selectedReceipt.joinDate).toLocaleDateString()}</Text>
+                </View>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 20, borderBottomWidth: 1, borderBottomColor: '#f1f1f1', paddingBottom: 12 }}>
+                  <Text style={{ color: '#8b85a3', fontSize: 13 }}>Verified UTR No.</Text>
+                  <Text style={{ color: '#1e1b29', fontSize: 13, fontWeight: 'bold', fontFamily: 'monospace' }}>{selectedReceipt.utrNumber}</Text>
+                </View>
+
+                <TouchableOpacity style={{ backgroundColor: '#f1f1f1', paddingVertical: 12, borderRadius: 10, alignItems: 'center' }} onPress={() => setReceiptModalVisible(false)}>
+                  <Text style={{ color: '#5f5a75', fontWeight: 'bold' }}>Close Receipt</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+          </View>
+        </View>
+      </Modal>
+
+      {/* Floating Action Button */}
+      <TouchableOpacity
+        style={styles.fab}
+        onPress={() => navigation.navigate('AddHostel')}
+        activeOpacity={0.8}
+      >
+        <Text style={styles.fabIcon}>+</Text>
+      </TouchableOpacity>
+
     </SafeAreaView>
   );
 }
@@ -411,28 +749,47 @@ export default function DashboardScreen({ navigation }) {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f8f6fc' },
   scrollContent: { padding: 16 },
+  proHeaderBg: {
+    backgroundColor: '#4c1d95',
+    paddingTop: 20,
+    paddingBottom: 60,
+    paddingHorizontal: 20,
+    borderBottomLeftRadius: 30,
+    borderBottomRightRadius: 30,
+    marginHorizontal: -16,
+    marginTop: -16,
+    marginBottom: -40
+  },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 20
   },
-  welcomeText: { fontSize: 13, color: '#8b85a3' },
-  ownerName: { fontSize: 20, fontWeight: 'bold', color: '#1e1b29' },
-  btnAdd: {
-    backgroundColor: '#7c3aed',
-    paddingVertical: 9,
-    paddingHorizontal: 18,
-    borderRadius: 10
-  },
-  btnAddText: { color: '#ffffff', fontWeight: 'bold', fontSize: 13 },
-  statsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 16 },
+  welcomeText: { fontSize: 14, color: '#ddd6fe' },
+  ownerName: { fontSize: 24, fontWeight: '900', color: '#ffffff' },
+  proBadge: { backgroundColor: '#f59e0b', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12 },
+  proBadgeText: { color: '#fff', fontSize: 10, fontWeight: '900' },
+  statsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 16, zIndex: 10 },
   statCard: {
     width: '47%',
     borderRadius: 16,
     padding: 16,
-    alignItems: 'flex-start'
+    alignItems: 'flex-start',
+    backgroundColor: 'rgba(255,255,255,0.9)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.5)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.1,
+    shadowRadius: 15,
+    elevation: 5
   },
+  statIconWrapperPurple: { backgroundColor: '#ede9fe', padding: 8, borderRadius: 12, marginBottom: 8 },
+  statIconWrapperGreen: { backgroundColor: '#d1fae5', padding: 8, borderRadius: 12, marginBottom: 8 },
+  statIconWrapperAmber: { backgroundColor: '#fef3c7', padding: 8, borderRadius: 12, marginBottom: 8 },
+  statIconWrapperBlue: { backgroundColor: '#dbeafe', padding: 8, borderRadius: 12, marginBottom: 8 },
+  statCardIcon: { fontSize: 20 },
   statCardPurple: { backgroundColor: '#ede9fe', borderWidth: 1, borderColor: 'rgba(124,58,237,0.15)' },
   statCardGreen: { backgroundColor: '#d1fae5', borderWidth: 1, borderColor: 'rgba(16,185,129,0.15)' },
   statCardAmber: { backgroundColor: '#fef3c7', borderWidth: 1, borderColor: 'rgba(245,158,11,0.15)' },
@@ -498,15 +855,23 @@ const styles = StyleSheet.create({
   cardStatVal: { fontSize: 13, fontWeight: 'bold', color: '#7c3aed' },
   cardStatLabel: { fontSize: 10, color: '#a09abc', marginTop: 2 },
   cardStatDivider: { width: 1, height: 24, backgroundColor: 'rgba(124,58,237,0.12)' },
-  cardActionRow: { flexDirection: 'row', gap: 8 },
+  cardActionRow: { flexDirection: 'row', gap: 6 },
+  actionBtnQuickUpdate: {
+    flex: 1.2,
+    backgroundColor: '#7c3aed',
+    paddingVertical: 9,
+    borderRadius: 10,
+    alignItems: 'center'
+  },
+  actionBtnQuickUpdateText: { color: '#ffffff', fontWeight: 'bold', fontSize: 12 },
   actionBtnAnalytics: {
     flex: 1,
-    backgroundColor: 'rgba(124,58,237,0.08)',
+    backgroundColor: '#ede9fe',
     paddingVertical: 9,
     borderRadius: 10,
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: 'rgba(124,58,237,0.2)'
+    borderColor: '#c4b5fd'
   },
   actionBtnAnalyticsText: { color: '#7c3aed', fontWeight: 'bold', fontSize: 12 },
   actionBtnEdit: {
@@ -519,16 +884,6 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(124,58,237,0.12)'
   },
   actionBtnEditText: { color: '#5f5a75', fontWeight: 'bold', fontSize: 12 },
-  actionBtnDelete: {
-    width: 42,
-    paddingVertical: 9,
-    borderRadius: 10,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#fecaca',
-    backgroundColor: '#fef2f2'
-  },
-  actionBtnDeleteText: { fontSize: 16 },
   emptyBox: { alignItems: 'center', paddingVertical: 40 },
   emptyIcon: { fontSize: 48, marginBottom: 12 },
   emptyTitle: { fontSize: 18, fontWeight: 'bold', color: '#1e1b29', marginBottom: 8 },
@@ -602,5 +957,41 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginTop: 12
   },
-  analyticsCloseBtnText: { color: '#ffffff', fontWeight: 'bold', fontSize: 15 }
+  analyticsCloseBtnText: { color: '#ffffff', fontWeight: 'bold', fontSize: 15 },
+  // Quick Modal
+  quickModalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', padding: 20 },
+  quickModalBox: { backgroundColor: '#ffffff', borderRadius: 20, padding: 20, elevation: 5 },
+  quickModalTitle: { fontSize: 18, fontWeight: 'bold', color: '#1e1b29', marginBottom: 4 },
+  quickModalSub: { fontSize: 13, color: '#8b85a3', marginBottom: 20 },
+  quickInputRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
+  quickInputLabel: { fontSize: 14, color: '#5f5a75', fontWeight: '600' },
+  quickInput: { width: 80, height: 40, borderWidth: 1, borderColor: '#e5e0f8', borderRadius: 8, textAlign: 'center', backgroundColor: '#f8f6fc', color: '#1e1b29', fontWeight: 'bold' },
+  quickActionRow: { flexDirection: 'row', justifyContent: 'flex-end', gap: 12, marginTop: 20 },
+  quickCancelBtn: { paddingVertical: 10, paddingHorizontal: 16, borderRadius: 8, backgroundColor: '#f1f1f1' },
+  quickCancelText: { color: '#5f5a75', fontWeight: 'bold' },
+  quickSaveBtn: { paddingVertical: 10, paddingHorizontal: 20, borderRadius: 8, backgroundColor: '#7c3aed', minWidth: 120, alignItems: 'center' },
+  quickSaveText: { color: '#ffffff', fontWeight: 'bold' },
+  fab: {
+    position: 'absolute',
+    bottom: 30,
+    right: 20,
+    backgroundColor: '#f59e0b',
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#f59e0b',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.4,
+    shadowRadius: 10,
+    elevation: 8,
+    zIndex: 100
+  },
+  fabIcon: {
+    color: '#ffffff',
+    fontSize: 32,
+    fontWeight: '400',
+    marginTop: -2
+  }
 });

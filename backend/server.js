@@ -53,6 +53,8 @@ app.use('/api/messages', require('./routes/messages'));
 app.use('/api/notifications', require('./routes/notifications'));
 app.use('/api/collections', require('./routes/collections'));
 app.use('/api/upload', require('./routes/upload'));
+app.use('/api/payments', require('./routes/payments'));
+app.use('/api/tenants', require('./routes/tenants'));
 
 // Root Endpoint for verification
 app.get('/api/health', (req, res) => {

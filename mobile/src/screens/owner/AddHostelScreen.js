@@ -41,6 +41,15 @@ export default function AddHostelScreen({ route, navigation }) {
   const [sharing4Vacancy, setSharing4Vacancy] = useState('0');
   const [sharing5Vacancy, setSharing5Vacancy] = useState('0');
 
+  // New: Fees & Rules
+  const [depositAmount, setDepositAmount] = useState('0');
+  const [maintenanceFee, setMaintenanceFee] = useState('0');
+  const [noticePeriodDays, setNoticePeriodDays] = useState('30');
+  const [curfewTime, setCurfewTime] = useState('No curfew');
+  const [visitorsAllowed, setVisitorsAllowed] = useState(false);
+  const [smokingAllowed, setSmokingAllowed] = useState(false);
+  const [drinkingAllowed, setDrinkingAllowed] = useState(false);
+
   // Photo uploads
   const [localPhotos, setLocalPhotos] = useState([]);
   const [localFoodPhotos, setLocalFoodPhotos] = useState([]);
@@ -81,6 +90,17 @@ export default function AddHostelScreen({ route, navigation }) {
         setSharing3Vacancy(editHostel.availability.sharing3Vacancy?.toString() || '0');
         setSharing4Vacancy(editHostel.availability.sharing4Vacancy?.toString() || '0');
         setSharing5Vacancy(editHostel.availability.sharing5Vacancy?.toString() || '0');
+      }
+      if (editHostel.fees) {
+        setDepositAmount(editHostel.fees.depositAmount?.toString() || '0');
+        setMaintenanceFee(editHostel.fees.maintenanceFee?.toString() || '0');
+        setNoticePeriodDays(editHostel.fees.noticePeriodDays?.toString() || '30');
+      }
+      if (editHostel.rules) {
+        setCurfewTime(editHostel.rules.curfewTime || 'No curfew');
+        setVisitorsAllowed(!!editHostel.rules.visitorsAllowed);
+        setSmokingAllowed(!!editHostel.rules.smokingAllowed);
+        setDrinkingAllowed(!!editHostel.rules.drinkingAllowed);
       }
     }
   }, [editHostel]);
@@ -191,7 +211,18 @@ export default function AddHostelScreen({ route, navigation }) {
         sharing2Vacancy: parseInt(sharing2Vacancy) || 0,
         sharing3Vacancy: parseInt(sharing3Vacancy) || 0,
         sharing4Vacancy: parseInt(sharing4Vacancy) || 0,
-        sharing5Vacancy: parseInt(sharing5Vacancy) || 0
+        sharing5Vacancy: parseInt(sharing5Vacancy) || 0,
+        fees: {
+          depositAmount: parseInt(depositAmount) || 0,
+          maintenanceFee: parseInt(maintenanceFee) || 0,
+          noticePeriodDays: parseInt(noticePeriodDays) || 0
+        },
+        rules: {
+          curfewTime: curfewTime.trim() || 'No curfew',
+          visitorsAllowed,
+          smokingAllowed,
+          drinkingAllowed
+        }
       };
 
       const res = isEditMode
@@ -390,6 +421,69 @@ export default function AddHostelScreen({ route, navigation }) {
             />
           </View>
         </View>
+
+        {/* Fees */}
+        <Text style={styles.subTitle}>💰 Security Deposit & Fees</Text>
+        <Text style={styles.hintText}>Be transparent about your extra charges.</Text>
+        <View style={styles.row}>
+          <View style={styles.halfCol}>
+            <Text style={styles.label}>Deposit Amount (₹)</Text>
+            <TextInput
+              value={depositAmount}
+              onChangeText={setDepositAmount}
+              keyboardType="numeric"
+              style={styles.input}
+              placeholder="e.g. 5000"
+            />
+          </View>
+          <View style={styles.halfCol}>
+            <Text style={styles.label}>Maintenance Fee (₹/mo)</Text>
+            <TextInput
+              value={maintenanceFee}
+              onChangeText={setMaintenanceFee}
+              keyboardType="numeric"
+              style={styles.input}
+              placeholder="e.g. 500"
+            />
+          </View>
+        </View>
+        <View style={styles.row}>
+          <View style={styles.halfCol}>
+            <Text style={styles.label}>Notice Period (Days)</Text>
+            <TextInput
+              value={noticePeriodDays}
+              onChangeText={setNoticePeriodDays}
+              keyboardType="numeric"
+              style={styles.input}
+              placeholder="e.g. 15 or 30"
+            />
+          </View>
+        </View>
+
+        {/* Rules */}
+        <Text style={styles.subTitle}>📜 House Rules & Policies</Text>
+        <Text style={styles.hintText}>Set clear expectations for your tenants.</Text>
+        <Text style={styles.label}>Curfew Time</Text>
+        <TextInput
+          value={curfewTime}
+          onChangeText={setCurfewTime}
+          style={styles.input}
+          placeholder="e.g. 10:00 PM or No curfew"
+        />
+        
+        <View style={styles.switchRow}>
+          <Text style={styles.switchLabel}>Visitors Allowed</Text>
+          <Switch value={visitorsAllowed} onValueChange={setVisitorsAllowed} trackColor={{ false: '#eae6f5', true: '#7c3aed' }} />
+        </View>
+        <View style={styles.switchRow}>
+          <Text style={styles.switchLabel}>Smoking Allowed</Text>
+          <Switch value={smokingAllowed} onValueChange={setSmokingAllowed} trackColor={{ false: '#eae6f5', true: '#7c3aed' }} />
+        </View>
+        <View style={styles.switchRow}>
+          <Text style={styles.switchLabel}>Drinking Allowed</Text>
+          <Switch value={drinkingAllowed} onValueChange={setDrinkingAllowed} trackColor={{ false: '#eae6f5', true: '#7c3aed' }} />
+        </View>
+
         <Text style={styles.label}>Gender Suitability</Text>
         <View style={styles.genderRow}>
           {['boys', 'girls', 'both'].map(g => (

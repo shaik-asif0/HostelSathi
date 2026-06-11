@@ -113,4 +113,19 @@ export const notificationsAPI = {
   delete: (id) => apiClient.delete(`/notifications/${id}`),
 };
 
+export const paymentsAPI = {
+  unlockHostel: (hostelId) => apiClient.post('/payments/unlock', { hostelId }),
+  verifyScreenshot: (formData) => apiClient.post('/payments/verify-screenshot', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' }
+  }),
+};
+
+export const tenantsAPI = {
+  joinHostel: (formData) => apiClient.post('/tenants/join', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' }
+  }),
+  getTenantsByHostel: (hostelId) => apiClient.get(`/tenants/hostel/${hostelId}`),
+  removeTenant: (tenantId) => apiClient.put(`/tenants/${tenantId}/remove`)
+};
+
 export default apiClient;

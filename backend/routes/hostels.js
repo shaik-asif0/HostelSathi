@@ -345,7 +345,9 @@ router.post('/', protect, authorize('owner'), async (req, res) => {
       isPremium,
       singleVacancy,
       sharing2Vacancy,
-      sharing3Vacancy
+      sharing3Vacancy,
+      rules,
+      fees
     } = req.body;
 
     // Split colleges and amenities lists if they arrive as strings
@@ -382,6 +384,8 @@ router.post('/', protect, authorize('owner'), async (req, res) => {
       rating: 0,
       reviewCount: 0,
       photos: [],
+      rules: rules || {},
+      fees: fees || {},
       availability: {
         singleVacancy: parseInt(singleVacancy || 0),
         sharing2Vacancy: parseInt(sharing2Vacancy || 0),
@@ -429,7 +433,10 @@ router.put('/:id', protect, authorize('owner'), async (req, res) => {
       foodType,
       amenities,
       gender,
-      isPremium
+      isPremium,
+      rules,
+      fees,
+      paymentUpiId
     } = req.body;
 
     const updateData = {};
@@ -466,6 +473,9 @@ router.put('/:id', protect, authorize('owner'), async (req, res) => {
     if (isPremium !== undefined) {
       updateData.isPremium = isPremium === 'true' || isPremium === true;
     }
+    if (rules) updateData.rules = rules;
+    if (fees) updateData.fees = fees;
+    if (paymentUpiId !== undefined) updateData.paymentUpiId = paymentUpiId;
 
     hostel = await Hostel.findByIdAndUpdate(req.params.id, updateData, {
       new: true,

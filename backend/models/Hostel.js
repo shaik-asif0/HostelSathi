@@ -109,6 +109,22 @@ const HostelSchema = new mongoose.Schema({
     type: [Number],
     default: [0, 0, 0, 0, 0, 0, 0]
   },
+  // Advanced Features: Rules & Fees
+  paymentUpiId: {
+    type: String,
+    default: ''
+  },
+  rules: {
+    curfewTime: { type: String, default: 'No curfew' },
+    visitorsAllowed: { type: Boolean, default: false },
+    smokingAllowed: { type: Boolean, default: false },
+    drinkingAllowed: { type: Boolean, default: false }
+  },
+  fees: {
+    depositAmount: { type: Number, default: 0 },
+    maintenanceFee: { type: Number, default: 0 },
+    noticePeriodDays: { type: Number, default: 30 }
+  },
   createdAt: {
     type: Date,
     default: Date.now
