@@ -1,0 +1,11 @@
+node_modules/
+.env
+build/
+dist/
+.DS_Store
+mobile/android/app/build/
+mobile/android/.gradle/
+mobile/ios/Pods/
+mobile/ios/build/
+*.apk
+*.aab
