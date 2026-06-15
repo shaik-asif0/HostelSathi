@@ -10,7 +10,7 @@ import { Platform } from 'react-native';
  *
  * ⚠️ If your Wi-Fi IP changes, update PHYSICAL_DEVICE_IP below.
  */
-const PHYSICAL_DEVICE_IP = '192.168.1.37'; // ← Your PC's Wi-Fi IP
+const PHYSICAL_DEVICE_IP = '192.168.1.35'; // ← Your PC's Wi-Fi IP
 const EMULATOR_HOST = '10.0.2.2';
 
 // Since you are testing on a physical Android device, you MUST use your PC's Wi-Fi IP address.
@@ -23,6 +23,11 @@ const apiClient = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
+});
+
+const uploadClient = axios.create({
+  baseURL: BASE_URL,
+  timeout: 60000, // 60 seconds for uploads
 });
 
 // ✅ Request interceptor: automatically attach JWT token
@@ -60,13 +65,15 @@ apiClient.interceptors.response.use(
   }
 );
 
+// Setup interceptors for uploadClient
+uploadClient.interceptors.request.use(apiClient.interceptors.request.handlers[0].fulfilled, apiClient.interceptors.request.handlers[0].rejected);
+uploadClient.interceptors.response.use(apiClient.interceptors.response.handlers[0].fulfilled, apiClient.interceptors.response.handlers[0].rejected);
+
 // ─── Typed API methods ────────────────────────────────────────────────────────
 
 export const uploadAPI = {
   uploadFiles: (formData) =>
-    apiClient.post('/upload', formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    }),
+    uploadClient.post('/upload', formData),
 };
 
 
@@ -87,12 +94,10 @@ export const hostelsAPI = {
   create: (data) => apiClient.post('/hostels', data),
   update: (id, data) => apiClient.put(`/hostels/${id}`, data),
   delete: (id) => apiClient.delete(`/hostels/${id}`),
-  trackView: (id) => apiClient.post(`/hostels/${id}/track-view`),
+  trackView: (id) => apiClient.post(`/hostels/${id}/track-view`, {}),
   getAnalytics: (id) => apiClient.get(`/hostels/${id}/analytics`),
   uploadPhotos: (id, formData) =>
-    apiClient.post(`/hostels/${id}/photos`, formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    }),
+    uploadClient.post(`/hostels/${id}/photos`, formData),
 };
 
 export const reviewsAPI = {
@@ -115,17 +120,33 @@ export const notificationsAPI = {
 
 export const paymentsAPI = {
   unlockHostel: (hostelId) => apiClient.post('/payments/unlock', { hostelId }),
-  verifyScreenshot: (formData) => apiClient.post('/payments/verify-screenshot', formData, {
-    headers: { 'Content-Type': 'multipart/form-data' }
-  }),
+  verifyScreenshot: (formData) => uploadClient.post('/payments/verify-screenshot', formData),
 };
 
 export const tenantsAPI = {
-  joinHostel: (formData) => apiClient.post('/tenants/join', formData, {
-    headers: { 'Content-Type': 'multipart/form-data' }
-  }),
+  joinHostel: (formData) => uploadClient.post('/tenants/join', formData),
   getTenantsByHostel: (hostelId) => apiClient.get(`/tenants/hostel/${hostelId}`),
-  removeTenant: (tenantId) => apiClient.put(`/tenants/${tenantId}/remove`)
+  removeTenant: (tenantId) => apiClient.put(`/tenants/${tenantId}/remove`, {})
+};
+
+export const collectionsAPI = {
+  getAll: () => apiClient.get('/collections'),
+  create: (name) => apiClient.post('/collections', { name }),
+  addHostel: (collectionId, hostelId) => apiClient.post(`/collections/${collectionId}/add`, { hostelId }),
+  removeHostel: (collectionId, hostelId) => apiClient.post(`/collections/${collectionId}/remove`, { hostelId }),
+  delete: (collectionId) => apiClient.delete(`/collections/${collectionId}`),
+};
+
+export const profileAPI = {
+  updatePreferences: (data) => apiClient.put('/auth/preferences', data),
+  updateProfile: (data) => apiClient.put('/auth/profile', data),
+};
+
+export const messagesAPI = {
+  getConversations: () => apiClient.get('/messages/conversations/list'),
+  getMessages: (hostelId, studentId) => 
+    apiClient.get(`/messages/${hostelId}${studentId ? `/${studentId}` : ''}`),
+  sendMessage: (data) => apiClient.post('/messages', data)
 };
 
 export default apiClient;

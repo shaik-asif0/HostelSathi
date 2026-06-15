@@ -90,6 +90,14 @@ const HostelSchema = new mongoose.Schema({
     type: Number,
     default: 0
   },
+  safetyScore: {
+    type: Number,
+    default: 0
+  },
+  foodRating: {
+    type: Number,
+    default: 0
+  },
   // Availability tracking for room booking calendar
   availability: {
     singleVacancy: { type: Number, default: 0 },

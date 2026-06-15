@@ -51,13 +51,17 @@ const UserSchema = new mongoose.Schema({
     type: [String],
     default: []
   },
-  // Wishlist Collections: [{name, hostels: [hostelId]}]
   savedCollections: {
     type: [{
       name: { type: String, required: true },
       hostels: { type: [String], default: [] },
       createdAt: { type: Date, default: Date.now }
     }],
+    default: []
+  },
+  // Unlocked contact details for hostels
+  unlockedHostels: {
+    type: [String],
     default: []
   },
   createdAt: {

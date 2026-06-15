@@ -7,6 +7,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useDispatch } from 'react-redux';
 import { loginSuccess } from '../../redux/authSlice';
 import { authAPI } from '../../api/apiClient';
+import Ionicons from 'react-native-vector-icons/Ionicons';
 
 const TABS = { LOGIN: 'login', REGISTER: 'register', OTP: 'otp' };
 
@@ -59,6 +60,13 @@ export default function AuthScreen() {
       if (res.data.success) {
         // Save the login ID for next time (remember me)
         await AsyncStorage.setItem('savedLoginId', loginId.trim());
+
+        // Fix 401: Save token and user data to AsyncStorage BEFORE dispatching
+        await AsyncStorage.multiSet([
+          ['userToken', res.data.token],
+          ['userData', JSON.stringify(res.data.user)]
+        ]);
+
         dispatch(loginSuccess({ user: res.data.user, token: res.data.token }));
         // Navigation happens automatically via AppNavigator based on auth state
       }
@@ -97,8 +105,12 @@ export default function AuthScreen() {
         college: role === 'student' ? regCollege.trim() : ''
       });
       if (res.data.success) {
+        await AsyncStorage.multiSet([
+          ['userToken', res.data.token],
+          ['userData', JSON.stringify(res.data.user)]
+        ]);
         dispatch(loginSuccess({ user: res.data.user, token: res.data.token }));
-        Alert.alert('Welcome to HostelSathi! 🎉', `Account created as ${role === 'owner' ? 'Hostel Owner' : 'Student'}.`);
+        Alert.alert('Welcome to HostelSathi!', `Account created as ${role === 'owner' ? 'Hostel Owner' : 'Student'}.`);
       }
     } catch (err) {
       let msg = 'Registration failed. Please try again.';
@@ -144,6 +156,10 @@ export default function AuthScreen() {
       const res = await authAPI.verifyOtp(otpPhone, otpCode);
       if (res.data.success) {
         if (res.data.registered) {
+          await AsyncStorage.multiSet([
+            ['userToken', res.data.token],
+            ['userData', JSON.stringify(res.data.user)]
+          ]);
           dispatch(loginSuccess({ user: res.data.user, token: res.data.token }));
         } else {
           // Verified but new user — move to register tab with phone pre-filled
@@ -169,7 +185,7 @@ export default function AuthScreen() {
 
           {/* Logo & Hero */}
           <View style={styles.hero}>
-            <Text style={styles.logoEmoji}>🏠</Text>
+            <Ionicons name="home" size={52} color="#312E81" style={{ marginBottom: 6 }} />
             <Text style={styles.logoText}>HostelSathi</Text>
             <Text style={styles.heroSub}>Hyderabad's #1 Student Hostel App</Text>
           </View>
@@ -247,14 +263,14 @@ export default function AuthScreen() {
                     style={[styles.roleBtn, role === 'student' && styles.roleBtnActive]}
                     onPress={() => setRole('student')}
                   >
-                    <Text style={styles.roleEmoji}>🎓</Text>
+                    <Ionicons name="school" size={24} color={role === 'student' ? "#312E81" : "#8b85a3"} style={{ marginBottom: 4 }} />
                     <Text style={[styles.roleBtnText, role === 'student' && styles.roleBtnTextActive]}>Student</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
                     style={[styles.roleBtn, role === 'owner' && styles.roleBtnActive]}
                     onPress={() => setRole('owner')}
                   >
-                    <Text style={styles.roleEmoji}>🏠</Text>
+                    <Ionicons name="home" size={24} color={role === 'owner' ? "#312E81" : "#8b85a3"} style={{ marginBottom: 4 }} />
                     <Text style={[styles.roleBtnText, role === 'owner' && styles.roleBtnTextActive]}>Hostel Owner</Text>
                   </TouchableOpacity>
                 </View>
@@ -317,9 +333,14 @@ export default function AuthScreen() {
                 >
                   {loading
                     ? <ActivityIndicator color="#fff" />
-                    : <Text style={styles.btnPrimaryText}>
-                        {role === 'owner' ? '🏠 Register as Owner' : '🎓 Register as Student'}
-                      </Text>
+                    : (
+                      <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                        <Ionicons name={role === 'owner' ? "home" : "school"} size={16} color="#fff" style={{ marginRight: 6 }} />
+                        <Text style={styles.btnPrimaryText}>
+                          {role === 'owner' ? 'Register as Owner' : 'Register as Student'}
+                        </Text>
+                      </View>
+                    )
                   }
                 </TouchableOpacity>
                 <TouchableOpacity style={styles.switchLink} onPress={() => { setTab(TABS.LOGIN); resetForm(); }}>
@@ -393,7 +414,11 @@ export default function AuthScreen() {
           </View>
 
           {/* Footer */}
-          <Text style={styles.footerText}>Built with ❤️ in Hyderabad</Text>
+          <View style={{ flexDirection: 'row', justifyContent: 'center', alignItems: 'center', marginTop: 24 }}>
+            <Text style={[styles.footerText, { marginTop: 0 }]}>Built with </Text>
+            <Ionicons name="heart" size={12} color="#ef4444" />
+            <Text style={[styles.footerText, { marginTop: 0 }]}> in Hyderabad</Text>
+          </View>
 
         </ScrollView>
       </KeyboardAvoidingView>
@@ -402,11 +427,10 @@ export default function AuthScreen() {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#f0ebfc' },
+  safe: { flex: 1, backgroundColor: '#F9FAFB' },
   container: { padding: 24, paddingTop: 32, paddingBottom: 40 },
   hero: { alignItems: 'center', marginBottom: 28 },
-  logoEmoji: { fontSize: 52, marginBottom: 6 },
-  logoText: { fontSize: 30, fontWeight: 'bold', color: '#5b21b6', letterSpacing: 0.5 },
+  logoText: { fontSize: 30, fontWeight: 'bold', color: '#312E81', letterSpacing: 0.5 },
   heroSub: { fontSize: 13, color: '#7c6ba8', marginTop: 4 },
   card: {
     backgroundColor: '#ffffff',
@@ -414,7 +438,7 @@ const styles = StyleSheet.create({
     padding: 22,
     borderWidth: 1,
     borderColor: 'rgba(124,58,237,0.12)',
-    shadowColor: '#7c3aed',
+    shadowColor: '#4F46E5',
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.12,
     shadowRadius: 20,
@@ -422,13 +446,13 @@ const styles = StyleSheet.create({
   },
   tabRow: {
     flexDirection: 'row',
-    backgroundColor: '#f0ebfc',
+    backgroundColor: '#ffffff',
     borderRadius: 10,
     padding: 4,
     marginBottom: 20
   },
   tab: { flex: 1, paddingVertical: 9, alignItems: 'center', borderRadius: 8 },
-  tabActive: { backgroundColor: '#7c3aed' },
+  tabActive: { backgroundColor: '#4F46E5' },
   tabText: { fontSize: 12, fontWeight: '600', color: '#7c6ba8' },
   tabTextActive: { color: '#ffffff' },
   formLabel: { fontSize: 11, fontWeight: '700', color: '#8b85a3', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6 },
@@ -439,7 +463,7 @@ const styles = StyleSheet.create({
     padding: 13,
     fontSize: 15,
     color: '#1e1b29',
-    backgroundColor: '#faf8ff',
+    backgroundColor: '#EEF2FF',
     marginBottom: 14
   },
   otpInput: { textAlign: 'center', fontSize: 24, letterSpacing: 12, fontWeight: 'bold' },
@@ -451,19 +475,18 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     borderWidth: 2,
     borderColor: 'rgba(124,58,237,0.2)',
-    backgroundColor: '#faf8ff'
+    backgroundColor: '#EEF2FF'
   },
-  roleBtnActive: { borderColor: '#7c3aed', backgroundColor: '#ede9fe' },
-  roleEmoji: { fontSize: 24, marginBottom: 4 },
+  roleBtnActive: { borderColor: '#4F46E5', backgroundColor: '#EEF2FF' },
   roleBtnText: { fontSize: 12, fontWeight: '700', color: '#8b85a3' },
-  roleBtnTextActive: { color: '#5b21b6' },
+  roleBtnTextActive: { color: '#312E81' },
   btnPrimary: {
-    backgroundColor: '#7c3aed',
+    backgroundColor: '#4F46E5',
     borderRadius: 12,
     paddingVertical: 15,
     alignItems: 'center',
     marginTop: 4,
-    shadowColor: '#7c3aed',
+    shadowColor: '#4F46E5',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 10,
@@ -472,7 +495,7 @@ const styles = StyleSheet.create({
   btnPrimaryText: { color: '#fff', fontWeight: 'bold', fontSize: 16 },
   switchLink: { marginTop: 16, alignItems: 'center' },
   switchLinkText: { color: '#8b85a3', fontSize: 13 },
-  switchLinkAccent: { color: '#7c3aed', fontWeight: 'bold' },
+  switchLinkAccent: { color: '#4F46E5', fontWeight: 'bold' },
   otpFeedbackBox: {
     backgroundColor: '#ecfdf5',
     borderWidth: 1,

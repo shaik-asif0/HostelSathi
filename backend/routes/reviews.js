@@ -9,14 +9,21 @@ const updateHostelRating = async (hostelId) => {
   const reviews = await Review.find({ hostel: hostelId });
   const reviewCount = reviews.length;
   
-  let rating = 0;
+  let rating = 0, safetyScore = 0, foodRating = 0;
   if (reviewCount > 0) {
-    const sum = reviews.reduce((acc, item) => acc + item.rating, 0);
-    rating = Math.round((sum / reviewCount) * 10) / 10; // Round to 1 decimal place
+    const sumRating = reviews.reduce((acc, item) => acc + item.rating, 0);
+    const sumSafety = reviews.reduce((acc, item) => acc + item.safetyScore, 0);
+    const sumFood = reviews.reduce((acc, item) => acc + item.foodRating, 0);
+    
+    rating = Math.round((sumRating / reviewCount) * 10) / 10;
+    safetyScore = Math.round((sumSafety / reviewCount) * 10) / 10;
+    foodRating = Math.round((sumFood / reviewCount) * 10) / 10;
   }
 
   await Hostel.findByIdAndUpdate(hostelId, {
     rating,
+    safetyScore,
+    foodRating,
     reviewCount
   });
 };
@@ -26,10 +33,10 @@ const updateHostelRating = async (hostelId) => {
 // @access  Private
 router.post('/', protect, authorize('student'), async (req, res) => {
   try {
-    const { hostelId, rating, comment } = req.body;
+    const { hostelId, rating, safetyScore, foodRating, comment } = req.body;
 
-    if (!hostelId || !rating || !comment) {
-      return res.status(400).json({ success: false, error: 'Please provide hostelId, rating, and comment' });
+    if (!hostelId || !rating || !safetyScore || !foodRating || !comment) {
+      return res.status(400).json({ success: false, error: 'Please provide hostelId, rating, safetyScore, foodRating, and comment' });
     }
 
     // Check if hostel exists
@@ -56,6 +63,8 @@ router.post('/', protect, authorize('student'), async (req, res) => {
       userName: req.user.name,
       hostel: hostelId,
       rating: parseInt(rating),
+      safetyScore: parseInt(safetyScore),
+      foodRating: parseInt(foodRating),
       comment
     });
 

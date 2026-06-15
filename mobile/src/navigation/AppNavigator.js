@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { useSelector } from 'react-redux';
+import Ionicons from 'react-native-vector-icons/Ionicons';
 
 // Auth
 import OnboardingScreen from '../screens/student/OnboardingScreen';
@@ -12,25 +13,33 @@ import AuthScreen from '../screens/student/AuthScreen';
 import HomeScreen from '../screens/student/HomeScreen';
 import SearchScreen from '../screens/student/SearchScreen';
 import SavedScreen from '../screens/student/SavedScreen';
-import ProfileScreen from '../screens/student/ProfileScreen';
-import HostelDetailScreen from '../screens/student/HostelDetailScreen';
-import CompareScreen from '../screens/student/CompareScreen';
-import ChatScreen from '../screens/student/ChatScreen';
-import NotificationsScreen from '../screens/student/NotificationsScreen';
-
-// Owner Screens
+import HostelListScreen from '../screens/student/HostelListScreen';
+import FilterScreen from '../screens/student/FilterScreen';
+// Shared Screens
 import DashboardScreen from '../screens/owner/DashboardScreen';
 import EnquiriesScreen from '../screens/owner/EnquiriesScreen';
 import AddHostelScreen from '../screens/owner/AddHostelScreen';
+import ConversationsScreen from '../screens/shared/ConversationsScreen';
+import ChatScreen from '../screens/student/ChatScreen';
+
+import ProfileScreen from '../screens/student/ProfileScreen';
+import HostelDetailScreen from '../screens/student/HostelDetailScreen';
+import CompareScreen from '../screens/student/CompareScreen';
+import DueManagementScreen from '../screens/student/DueManagementScreen';
+import MyReceiptsScreen from '../screens/student/MyReceiptsScreen';
+import MapScreen from '../screens/student/MapScreen';
+import NotificationsScreen from '../screens/student/NotificationsScreen';
+import ScanAndPayScreen from '../screens/student/ScanAndPayScreen';
+
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
 
 // Shared tab icon with badge support
-function TabIcon({ emoji, focused, badgeCount }) {
+function TabIcon({ iconName, focused, badgeCount }) {
   return (
     <View style={tabStyles.iconWrap}>
-      <Text style={[tabStyles.iconEmoji, focused && tabStyles.iconEmojiActive]}>{emoji}</Text>
+      <Ionicons name={iconName} size={24} color={focused ? '#4F46E5' : '#b0aac3'} />
       {badgeCount > 0 && (
         <View style={tabStyles.badge}>
           <Text style={tabStyles.badgeText}>{badgeCount > 9 ? '9+' : badgeCount}</Text>
@@ -41,24 +50,24 @@ function TabIcon({ emoji, focused, badgeCount }) {
 }
 
 const TAB_SCREEN_OPTIONS = {
-  tabBarActiveTintColor: '#7c3aed',
+  tabBarActiveTintColor: '#4F46E5',
   tabBarInactiveTintColor: '#b0aac3',
   tabBarStyle: {
     backgroundColor: '#ffffff',
     borderTopWidth: 1,
-    borderTopColor: 'rgba(124, 58, 237, 0.1)',
+    borderTopColor: 'rgba(79, 70, 229, 0.1)',
     paddingBottom: 6,
     paddingTop: 4,
     height: 64,
-    shadowColor: '#7c3aed',
+    shadowColor: '#4F46E5',
     shadowOffset: { width: 0, height: -4 },
     shadowOpacity: 0.06,
     shadowRadius: 12,
     elevation: 8
   },
   headerStyle: { backgroundColor: '#ffffff', elevation: 0, shadowColor: 'transparent' },
-  headerTintColor: '#7c3aed',
-  headerTitleStyle: { fontWeight: 'bold', fontSize: 17, color: '#1e1b29' },
+  headerTintColor: '#4F46E5',
+  headerTitleStyle: { fontWeight: 'bold', fontSize: 17, color: '#212121' },
   tabBarLabelStyle: { fontSize: 11, fontWeight: '600', marginTop: 2 }
 };
 
@@ -73,34 +82,26 @@ function StudentTabs() {
         options={{
           title: 'HostelSathi',
           tabBarLabel: 'Home',
-          tabBarIcon: ({ focused }) => <TabIcon emoji="🏠" focused={focused} badgeCount={0} />
+          tabBarIcon: ({ focused }) => <TabIcon iconName="home" focused={focused} badgeCount={0} />
         }}
       />
       <Tab.Screen
-        name="Search"
-        component={SearchScreen}
+        name="Chats"
+        component={ConversationsScreen}
         options={{
-          title: 'Search Hostels',
-          tabBarLabel: 'Search',
-          tabBarIcon: ({ focused }) => <TabIcon emoji="🔍" focused={focused} badgeCount={0} />
+          title: 'Messages',
+          tabBarLabel: 'Chats',
+          tabBarIcon: ({ focused }) => <TabIcon iconName="chatbubbles" focused={focused} badgeCount={0} />
         }}
       />
-      <Tab.Screen
-        name="Saved"
-        component={SavedScreen}
-        options={{
-          title: 'Saved Hostels',
-          tabBarLabel: 'Saved',
-          tabBarIcon: ({ focused }) => <TabIcon emoji="❤️" focused={focused} badgeCount={0} />
-        }}
-      />
+
       <Tab.Screen
         name="Profile"
         component={ProfileScreen}
         options={{
           title: 'My Profile',
           tabBarLabel: 'Profile',
-          tabBarIcon: ({ focused }) => <TabIcon emoji="👤" focused={focused} badgeCount={unreadCount} />
+          tabBarIcon: ({ focused }) => <TabIcon iconName="person" focused={focused} badgeCount={unreadCount} />
         }}
       />
     </Tab.Navigator>
@@ -118,7 +119,7 @@ function OwnerTabs() {
         options={{
           title: 'My PG Dashboard',
           tabBarLabel: 'Dashboard',
-          tabBarIcon: ({ focused }) => <TabIcon emoji="📊" focused={focused} badgeCount={0} />
+          tabBarIcon: ({ focused }) => <TabIcon iconName="stats-chart" focused={focused} badgeCount={0} />
         }}
       />
       <Tab.Screen
@@ -127,16 +128,26 @@ function OwnerTabs() {
         options={{
           title: 'Leads & Visits',
           tabBarLabel: 'Enquiries',
-          tabBarIcon: ({ focused }) => <TabIcon emoji="📩" focused={focused} badgeCount={0} />
+          tabBarIcon: ({ focused }) => <TabIcon iconName="mail" focused={focused} badgeCount={0} />
         }}
       />
+      <Tab.Screen
+        name="Chats"
+        component={ConversationsScreen}
+        options={{
+          title: 'Messages',
+          tabBarLabel: 'Chats',
+          tabBarIcon: ({ focused }) => <TabIcon iconName="chatbubbles" focused={focused} badgeCount={0} />
+        }}
+      />
+
       <Tab.Screen
         name="Profile"
         component={ProfileScreen}
         options={{
           title: 'My Account',
           tabBarLabel: 'Profile',
-          tabBarIcon: ({ focused }) => <TabIcon emoji="👤" focused={focused} badgeCount={unreadCount} />
+          tabBarIcon: ({ focused }) => <TabIcon iconName="person" focused={focused} badgeCount={unreadCount} />
         }}
       />
     </Tab.Navigator>
@@ -159,15 +170,23 @@ function StudentStack() {
     <Stack.Navigator
       screenOptions={{
         headerStyle: { backgroundColor: '#ffffff' },
-        headerTintColor: '#7c3aed',
-        headerTitleStyle: { fontWeight: 'bold', fontSize: 17, color: '#1e1b29' },
+        headerTintColor: '#4F46E5',
+        headerTitleStyle: { fontWeight: 'bold', fontSize: 17, color: '#212121' },
         headerBackTitleVisible: false
       }}
     >
       <Stack.Screen name="StudentTabs" component={StudentTabs} options={{ headerShown: false }} />
+      <Stack.Screen name="Search" component={SearchScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="Saved" component={SavedScreen} options={{ title: 'Wishlist' }} />
+      <Stack.Screen name="HostelList" component={HostelListScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="Filter" component={FilterScreen} options={{ presentation: 'fullScreenModal', headerShown: false }} />
       <Stack.Screen name="HostelDetail" component={HostelDetailScreen} options={{ title: 'Hostel Details' }} />
       <Stack.Screen name="Compare" component={CompareScreen} options={{ title: 'Compare Hostels' }} />
-      <Stack.Screen name="Chat" component={ChatScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="DueManagement" component={DueManagementScreen} options={{ title: 'Rent & Dues' }} />
+      <Stack.Screen name="MyReceipts" component={MyReceiptsScreen} options={{ title: 'Payment Receipts' }} />
+      <Stack.Screen name="Map" component={MapScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="ScanAndPay" component={ScanAndPayScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="Chat" component={ChatScreen} options={{ title: 'Chat' }} />
       <Stack.Screen name="Notifications" component={NotificationsScreen} options={{ headerShown: false }} />
     </Stack.Navigator>
   );
@@ -179,31 +198,29 @@ function OwnerStack() {
     <Stack.Navigator
       screenOptions={{
         headerStyle: { backgroundColor: '#ffffff' },
-        headerTintColor: '#7c3aed',
-        headerTitleStyle: { fontWeight: 'bold', fontSize: 17, color: '#1e1b29' },
+        headerTintColor: '#4F46E5',
+        headerTitleStyle: { fontWeight: 'bold', fontSize: 17, color: '#212121' },
         headerBackTitleVisible: false
       }}
     >
       <Stack.Screen name="OwnerTabs" component={OwnerTabs} options={{ headerShown: false }} />
       <Stack.Screen name="AddHostel" component={AddHostelScreen} options={{ title: 'Hostel Listing Form' }} />
+      <Stack.Screen name="Chat" component={ChatScreen} options={{ title: 'Chat' }} />
       <Stack.Screen name="Notifications" component={NotificationsScreen} options={{ headerShown: false }} />
+
     </Stack.Navigator>
   );
 }
 
 // ─── 6. ROOT NAVIGATOR ──────────────────────────────────────────────────────
+import SplashScreen from '../screens/shared/SplashScreen';
+
 export default function AppNavigator() {
   const { isAuthenticated, user, loading } = useSelector(state => state.auth);
 
-  // Show loading spinner while session is being restored from AsyncStorage
+  // Show premium splash screen while session is being restored from AsyncStorage
   if (loading) {
-    return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#f0ebfc' }}>
-        <Text style={{ fontSize: 40, marginBottom: 16 }}>🏠</Text>
-        <ActivityIndicator size="large" color="#7c3aed" />
-        <Text style={{ color: '#8b85a3', marginTop: 12, fontSize: 13 }}>Loading HostelSathi...</Text>
-      </View>
-    );
+    return <SplashScreen />;
   }
 
   // ✅ Route based on auth state + user role
@@ -220,8 +237,6 @@ export default function AppNavigator() {
 
 const tabStyles = StyleSheet.create({
   iconWrap: { position: 'relative', alignItems: 'center', justifyContent: 'center', width: 28, height: 28 },
-  iconEmoji: { fontSize: 20, opacity: 0.6 },
-  iconEmojiActive: { opacity: 1 },
   badge: {
     position: 'absolute', top: -4, right: -6,
     minWidth: 16, height: 16, borderRadius: 8,

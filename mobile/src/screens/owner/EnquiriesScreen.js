@@ -5,13 +5,14 @@ import {
 } from 'react-native';
 import { useSelector } from 'react-redux';
 import apiClient from '../../api/apiClient';
+import Ionicons from 'react-native-vector-icons/Ionicons';
 
 const STATUS_FILTERS = [
-  { key: 'all', label: 'All', emoji: '📋' },
-  { key: 'pending', label: 'Pending', emoji: '⏳' },
-  { key: 'contacted', label: 'Contacted', emoji: '📞' },
-  { key: 'visited', label: 'Visited', emoji: '🏠' },
-  { key: 'closed', label: 'Closed', emoji: '✅' }
+  { key: 'all', label: 'All', icon: 'list' },
+  { key: 'pending', label: 'Pending', icon: 'hourglass-outline' },
+  { key: 'contacted', label: 'Contacted', icon: 'call' },
+  { key: 'visited', label: 'Visited', icon: 'home' },
+  { key: 'closed', label: 'Closed', icon: 'checkmark-circle' }
 ];
 
 const STATUS_COLORS = {
@@ -116,7 +117,10 @@ export default function EnquiriesScreen() {
       {/* Hostel name if available */}
       {item.hostelName ? (
         <View style={styles.hostelTag}>
-          <Text style={styles.hostelTagText}>🏠 {item.hostelName}</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            <Ionicons name="home" size={10} color="#312E81" style={{ marginRight: 4 }} />
+            <Text style={styles.hostelTagText}>{item.hostelName}</Text>
+          </View>
         </View>
       ) : null}
 
@@ -134,14 +138,20 @@ export default function EnquiriesScreen() {
           onPress={() => handleCall(item.studentPhone)}
           activeOpacity={0.8}
         >
-          <Text style={styles.callBtnText}>📞 Call</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            <Ionicons name="call" size={13} color="#065f46" style={{ marginRight: 4 }} />
+            <Text style={styles.callBtnText}>Call</Text>
+          </View>
         </TouchableOpacity>
         <TouchableOpacity
           style={styles.whatsappBtn}
           onPress={() => handleWhatsApp(item.studentPhone, item.studentName)}
           activeOpacity={0.8}
         >
-          <Text style={styles.whatsappBtnText}>💬 WhatsApp</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            <Ionicons name="logo-whatsapp" size={13} color="#15803d" style={{ marginRight: 4 }} />
+            <Text style={styles.whatsappBtnText}>WhatsApp</Text>
+          </View>
         </TouchableOpacity>
       </View>
 
@@ -176,7 +186,10 @@ export default function EnquiriesScreen() {
     <SafeAreaView style={styles.safe}>
       {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Student Leads 📩</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+          <Text style={styles.headerTitle}>Student Leads</Text>
+          <Ionicons name="mail" size={20} color="#1e1b29" style={{ marginLeft: 6 }} />
+        </View>
         <Text style={styles.headerSub}>{enquiries.length} total enquiries</Text>
       </View>
 
@@ -193,8 +206,9 @@ export default function EnquiriesScreen() {
               style={[styles.filterTab, activeFilter === f.key && styles.filterTabActive]}
               onPress={() => setActiveFilter(f.key)}
             >
+              <Ionicons name={f.icon} size={12} color={activeFilter === f.key ? '#ffffff' : '#7c6ba8'} />
               <Text style={[styles.filterTabText, activeFilter === f.key && styles.filterTabTextActive]}>
-                {f.emoji} {f.label}
+                {f.label}
               </Text>
               {badgeCounts[f.key] > 0 && (
                 <View style={[styles.filterBadge, activeFilter === f.key && styles.filterBadgeActive]}>
@@ -211,7 +225,7 @@ export default function EnquiriesScreen() {
       {/* Content */}
       {loading ? (
         <View style={styles.centerBox}>
-          <ActivityIndicator size="large" color="#7c3aed" />
+          <ActivityIndicator size="large" color="#4F46E5" />
         </View>
       ) : (
         <FlatList
@@ -220,11 +234,11 @@ export default function EnquiriesScreen() {
           keyExtractor={item => item._id}
           contentContainerStyle={styles.listContent}
           refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor="#7c3aed" />
+            <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor="#4F46E5" />
           }
           ListEmptyComponent={
             <View style={styles.centerBox}>
-              <Text style={styles.emptyEmoji}>📭</Text>
+              <Ionicons name="mail-open-outline" size={48} color="#8b85a3" style={{ marginBottom: 12 }} />
               <Text style={styles.emptyTitle}>No enquiries {activeFilter !== 'all' ? `with "${activeFilter}" status` : 'yet'}</Text>
               <Text style={styles.emptySub}>
                 {activeFilter !== 'all'
@@ -240,7 +254,7 @@ export default function EnquiriesScreen() {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#f8f6fc' },
+  safe: { flex: 1, backgroundColor: '#F9FAFB' },
   header: {
     paddingHorizontal: 16, paddingTop: 16, paddingBottom: 12,
     backgroundColor: '#ffffff',
@@ -260,18 +274,18 @@ const styles = StyleSheet.create({
     paddingVertical: 6, paddingHorizontal: 12,
     borderRadius: 20, borderWidth: 1,
     borderColor: 'rgba(124,58,237,0.15)',
-    backgroundColor: '#faf8ff'
+    backgroundColor: '#EEF2FF'
   },
-  filterTabActive: { backgroundColor: '#7c3aed', borderColor: '#7c3aed' },
+  filterTabActive: { backgroundColor: '#4F46E5', borderColor: '#4F46E5' },
   filterTabText: { fontSize: 12, fontWeight: '600', color: '#7c6ba8' },
   filterTabTextActive: { color: '#ffffff' },
   filterBadge: {
-    backgroundColor: '#ede9fe', borderRadius: 10,
+    backgroundColor: '#EEF2FF', borderRadius: 10,
     minWidth: 18, height: 18, alignItems: 'center', justifyContent: 'center',
     paddingHorizontal: 4
   },
   filterBadgeActive: { backgroundColor: 'rgba(255,255,255,0.25)' },
-  filterBadgeText: { fontSize: 10, fontWeight: 'bold', color: '#7c3aed' },
+  filterBadgeText: { fontSize: 10, fontWeight: 'bold', color: '#4F46E5' },
   filterBadgeTextActive: { color: '#ffffff' },
   listContent: { padding: 14, paddingBottom: 30 },
   centerBox: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 60 },
@@ -282,7 +296,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#ffffff',
     borderRadius: 16, padding: 16, marginBottom: 14,
     borderWidth: 1, borderColor: 'rgba(124,58,237,0.1)',
-    shadowColor: '#7c3aed',
+    shadowColor: '#4F46E5',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.06,
     shadowRadius: 10,
@@ -295,20 +309,20 @@ const styles = StyleSheet.create({
   cardHeaderLeft: { flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 },
   avatarBox: {
     width: 40, height: 40, borderRadius: 20,
-    backgroundColor: '#ede9fe', alignItems: 'center', justifyContent: 'center'
+    backgroundColor: '#EEF2FF', alignItems: 'center', justifyContent: 'center'
   },
-  avatarText: { fontSize: 18, fontWeight: 'bold', color: '#7c3aed' },
+  avatarText: { fontSize: 18, fontWeight: 'bold', color: '#4F46E5' },
   studentName: { fontSize: 15, fontWeight: 'bold', color: '#1e1b29' },
   studentCollege: { fontSize: 11, color: '#8b85a3', marginTop: 1 },
   statusBadge: { paddingVertical: 4, paddingHorizontal: 10, borderRadius: 20 },
   statusText: { fontSize: 10, fontWeight: 'bold' },
   hostelTag: {
-    backgroundColor: '#f0ebfc', borderRadius: 6, paddingVertical: 4,
+    backgroundColor: '#ffffff', borderRadius: 6, paddingVertical: 4,
     paddingHorizontal: 10, alignSelf: 'flex-start', marginBottom: 8
   },
-  hostelTagText: { fontSize: 11, color: '#5b21b6', fontWeight: '600' },
+  hostelTagText: { fontSize: 11, color: '#312E81', fontWeight: '600' },
   msgBox: {
-    backgroundColor: '#f8f6fc', borderRadius: 10, padding: 10,
+    backgroundColor: '#ffffff', borderRadius: 10, padding: 10,
     borderWidth: 1, borderColor: 'rgba(124,58,237,0.06)', marginBottom: 12
   },
   msgText: { fontSize: 13, fontStyle: 'italic', color: '#5f5a75' },
@@ -333,8 +347,8 @@ const styles = StyleSheet.create({
   statusBtns: { flexDirection: 'row', gap: 6 },
   statusBtn: {
     flex: 1, paddingVertical: 7, borderRadius: 8, alignItems: 'center',
-    borderWidth: 1, backgroundColor: '#faf8ff'
+    borderWidth: 1, backgroundColor: '#EEF2FF'
   },
-  statusBtnActive: { backgroundColor: '#7c3aed', borderColor: '#7c3aed' },
+  statusBtnActive: { backgroundColor: '#4F46E5', borderColor: '#4F46E5' },
   statusBtnText: { fontSize: 11, fontWeight: '600', color: '#5f5a75' }
 });

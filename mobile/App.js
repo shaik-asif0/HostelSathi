@@ -8,10 +8,13 @@ import { restoreSession } from './src/redux/authSlice';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { loginSuccess } from './src/redux/authSlice';
 
+import { ThemeProvider, useTheme } from './src/theme/ThemeContext';
+
 // Persistence middleware: save token+user on loginSuccess
 function AppWithSessionRestore() {
   const dispatch = useDispatch();
   const { user, token, isAuthenticated } = useSelector(state => state.auth);
+  const { colors, isDarkMode } = useTheme();
 
   // On app mount: restore persisted session from AsyncStorage
   useEffect(() => {
@@ -28,9 +31,10 @@ function AppWithSessionRestore() {
 
   return (
     <>
-      {/* ✅ StatusBar outside NavigationContainer is fine */}
-      <StatusBar barStyle="light-content" backgroundColor="#7c3aed" />
-      {/* ✅ NavigationContainer wraps everything — SafeAreaView is handled per screen */}
+      <StatusBar 
+        barStyle={isDarkMode ? "light-content" : "dark-content"} 
+        backgroundColor={colors.background} 
+      />
       <NavigationContainer>
         <AppNavigator />
       </NavigationContainer>
@@ -41,7 +45,9 @@ function AppWithSessionRestore() {
 export default function App() {
   return (
     <Provider store={store}>
-      <AppWithSessionRestore />
+      <ThemeProvider>
+        <AppWithSessionRestore />
+      </ThemeProvider>
     </Provider>
   );
 }

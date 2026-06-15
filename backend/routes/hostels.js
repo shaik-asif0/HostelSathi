@@ -493,6 +493,33 @@ router.put('/:id', protect, authorize('owner'), async (req, res) => {
   }
 });
 
+// @route   PUT /api/hostels/:id/vacancies
+// @desc    Update a hostel's vacancy counts (Owner only)
+// @access  Private
+router.put('/:id/vacancies', protect, authorize('owner'), async (req, res) => {
+  try {
+    let hostel = await Hostel.findById(req.params.id);
+    if (!hostel) return res.status(404).json({ success: false, error: 'Hostel not found' });
+    if (hostel.owner.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ success: false, error: 'Not authorized' });
+    }
+
+    const { singleVacancy, sharing2Vacancy, sharing3Vacancy } = req.body;
+    
+    if (!hostel.availability) hostel.availability = {};
+    if (singleVacancy !== undefined) hostel.availability.singleVacancy = singleVacancy;
+    if (sharing2Vacancy !== undefined) hostel.availability.sharing2Vacancy = sharing2Vacancy;
+    if (sharing3Vacancy !== undefined) hostel.availability.sharing3Vacancy = sharing3Vacancy;
+    hostel.availability.lastUpdated = new Date();
+
+    await hostel.save();
+    res.json({ success: true, message: 'Vacancies updated', availability: hostel.availability });
+  } catch (err) {
+    console.error('Update vacancies error:', err);
+    res.status(500).json({ success: false, error: 'Failed to update vacancies' });
+  }
+});
+
 // @route   POST /api/hostels/:id/photos
 // @desc    Upload photos for a hostel listing (Owner only)
 // @access  Private

@@ -21,6 +21,18 @@ const ReviewSchema = new mongoose.Schema({
     min: 1,
     max: 5
   },
+  safetyScore: {
+    type: Number,
+    required: [true, 'Safety score is required'],
+    min: 1,
+    max: 5
+  },
+  foodRating: {
+    type: Number,
+    required: [true, 'Food rating is required'],
+    min: 1,
+    max: 5
+  },
   comment: {
     type: String,
     required: [true, 'Comment content is required'],

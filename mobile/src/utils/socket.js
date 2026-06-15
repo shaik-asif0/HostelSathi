@@ -1,6 +1,7 @@
 import { io } from 'socket.io-client';
 
-const SOCKET_URL = 'http://10.0.2.2:5000'; // Android emulator maps to localhost
+const PHYSICAL_DEVICE_IP = '192.168.1.35';
+const SOCKET_URL = `http://${PHYSICAL_DEVICE_IP}:5000`;
 
 let socket = null;
 

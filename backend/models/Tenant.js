@@ -28,14 +28,24 @@ const TenantSchema = new mongoose.Schema({
     type: String, // e.g. 'Single', 'Sharing 2', 'Sharing 3'
     required: true
   },
-  rentPaid: {
+  rentAmount: {
     type: Number,
     required: true
   },
-  utrNumber: {
-    type: String,
-    required: true,
-    unique: true
+  paidAmount: {
+    type: Number,
+    default: 0
+  },
+  pendingAmount: {
+    type: Number,
+    default: 0
+  },
+  dueDate: {
+    type: Date
+  },
+  lateFee: {
+    type: Number,
+    default: 0
   },
   status: {
     type: String,

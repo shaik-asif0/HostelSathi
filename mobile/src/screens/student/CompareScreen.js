@@ -1,5 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, SafeAreaView } from 'react-native';
+import Ionicons from 'react-native-vector-icons/Ionicons';
 
 export default function CompareScreen({ route, navigation }) {
   const { hostels = [] } = route.params;
@@ -13,7 +14,7 @@ export default function CompareScreen({ route, navigation }) {
     if (!h.location || !h.location.coordinates) return 0.5;
     const dLng = h.location.coordinates[0] - 78.3888;
     const dLat = h.location.coordinates[1] - 17.4950;
-    return Math.round(Math.sqrt(dLng*dLng + dLat*dLat) * 111 * 10) / 10;
+    return Math.round(Math.sqrt(dLng * dLng + dLat * dLat) * 111 * 10) / 10;
   };
 
   const minRents = hostels.map(getMinRent).filter(r => r > 0);
@@ -27,17 +28,18 @@ export default function CompareScreen({ route, navigation }) {
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity style={styles.btnBack} onPress={() => navigation.goBack()}>
-          <Text style={styles.btnBackText}>← Back</Text>
+          <Ionicons name="chevron-back" size={20} color="#4F46E5" />
+          <Text style={styles.btnBackText}>Back</Text>
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Comparison Matrix</Text>
       </View>
 
       <ScrollView contentContainerStyle={styles.scrollContent}>
-        
+
         {/* Comparison grid wrapper */}
         <ScrollView horizontal showsHorizontalScrollIndicator={false}>
           <View style={styles.table}>
-            
+
             {/* Table Row: Name */}
             <View style={styles.row}>
               <View style={[styles.cellHeader, styles.cellLabel]}>
@@ -61,7 +63,7 @@ export default function CompareScreen({ route, navigation }) {
                 const isCheapest = rent === cheapestRent;
                 return (
                   <View key={h._id} style={[styles.cell, isCheapest ? styles.cellHighlight : null]}>
-                    <Text style={[styles.valText, { color: '#7c3aed', fontWeight: 'bold' }]}>₹{rent}/mo</Text>
+                    <Text style={[styles.valText, { color: '#4F46E5', fontWeight: 'bold' }]}>₹{rent}/mo</Text>
                     {isCheapest ? <Text style={styles.badgeText}>Cheapest</Text> : null}
                   </View>
                 );
@@ -115,7 +117,10 @@ export default function CompareScreen({ route, navigation }) {
                 const isBest = rate === highestRating && rate > 0;
                 return (
                   <View key={h._id} style={[styles.cell, isBest ? styles.cellHighlight : null]}>
-                    <Text style={[styles.valText, { color: '#f59e0b', fontWeight: 'bold' }]}>★ {rate || 'New'}</Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                      <Ionicons name="star" size={10} color="#f59e0b" style={{ marginRight: 2 }} />
+                      <Text style={[styles.valText, { color: '#f59e0b', fontWeight: 'bold' }]}>{rate || 'New'}</Text>
+                    </View>
                   </View>
                 );
               })}
@@ -138,7 +143,7 @@ export default function CompareScreen({ route, navigation }) {
               <View style={[styles.cell, styles.cellLabel]}></View>
               {hostels.map(h => (
                 <View key={h._id} style={styles.cell}>
-                  <TouchableOpacity 
+                  <TouchableOpacity
                     style={styles.btnDetail}
                     onPress={() => navigation.navigate('HostelDetail', { hostelId: h._id })}
                   >
@@ -159,7 +164,7 @@ export default function CompareScreen({ route, navigation }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8f6fc',
+    backgroundColor: '#F9FAFB',
   },
   header: {
     flexDirection: 'row',
@@ -171,9 +176,11 @@ const styles = StyleSheet.create({
   },
   btnBack: {
     marginRight: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   btnBackText: {
-    color: '#7c3aed',
+    color: '#4F46E5',
     fontWeight: 'bold',
     fontSize: 15,
   },
@@ -248,7 +255,7 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   btnDetail: {
-    backgroundColor: '#7c3aed',
+    backgroundColor: '#4F46E5',
     paddingVertical: 5,
     paddingHorizontal: 12,
     borderRadius: 4,

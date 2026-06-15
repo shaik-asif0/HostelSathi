@@ -1,128 +1,254 @@
 const express = require('express');
 const router = express.Router();
-const User = require('../models/User');
-const UsedUTR = require('../models/UsedUTR');
-const { protect } = require('../middleware/auth');
+const Razorpay = require('razorpay');
+const crypto = require('crypto');
 const multer = require('multer');
-const tesseract = require('tesseract.js');
-
 const upload = multer({ storage: multer.memoryStorage() });
+const User = require('../models/User');
+const Payment = require('../models/Payment');
+const Tenant = require('../models/Tenant');
+const Hostel = require('../models/Hostel');
+const { protect } = require('../middleware/auth');
 
-// @route   POST /api/payments/unlock
-// @desc    Simulate payment of ₹5 to unlock hostel details
-// @access  Private (Students only)
-router.post('/unlock', protect, async (req, res) => {
+// Initialize Razorpay (User must provide real keys in .env)
+const razorpay = new Razorpay({
+  key_id: process.env.RAZORPAY_KEY_ID || 'rzp_test_placeholder',
+  key_secret: process.env.RAZORPAY_KEY_SECRET || 'secret_placeholder'
+});
+
+// @route   POST /api/payments/create-order
+// @desc    Create a Razorpay order for rent/deposit
+// @access  Private
+router.post('/create-order', protect, async (req, res) => {
   try {
-    const { hostelId } = req.body;
-    
-    if (!hostelId) {
-      return res.status(400).json({ success: false, error: 'Hostel ID is required' });
+    const { amount, type, tenantId, hostelId } = req.body;
+
+    if (!amount || !type || !hostelId) {
+      return res.status(400).json({ success: false, error: 'Missing required fields' });
     }
 
-    if (req.user.role !== 'student') {
-      return res.status(403).json({ success: false, error: 'Only students can unlock hostels' });
-    }
+    // Amount should be in paise (multiply by 100)
+    const options = {
+      amount: parseInt(amount) * 100,
+      currency: 'INR',
+      receipt: `receipt_${Date.now()}`
+    };
 
-    const user = await User.findById(req.user._id);
+    const order = await razorpay.orders.create(options);
 
-    // Check if already unlocked
-    if (user.unlockedHostels && user.unlockedHostels.includes(hostelId)) {
-      return res.status(400).json({ success: false, error: 'Hostel already unlocked' });
-    }
+    // Save initial Payment record
+    let ownerId;
+    const hostel = await Hostel.findById(hostelId);
+    if (hostel) ownerId = hostel.owner;
 
-    // SIMULATE PAYMENT PROCESSING...
-    // In a real app, you would verify a Razorpay/Stripe signature here.
-    
-    // Add to unlocked list
-    if (!user.unlockedHostels) {
-      user.unlockedHostels = [];
-    }
-    user.unlockedHostels.push(hostelId);
-    await user.save();
+    const payment = await Payment.create({
+      tenant: tenantId || null,
+      student: req.user._id,
+      hostel: hostelId,
+      owner: ownerId,
+      amount: parseInt(amount),
+      type,
+      razorpayOrderId: order.id,
+      status: 'created'
+    });
 
     res.json({
       success: true,
-      message: 'Payment successful. Hostel contact details unlocked!',
-      unlockedHostels: user.unlockedHostels
+      orderId: order.id,
+      amount: order.amount,
+      currency: order.currency,
+      paymentId: payment._id
     });
-
   } catch (error) {
-    console.error('Payment unlock error:', error);
-    res.status(500).json({ success: false, error: 'Failed to process payment' });
+    console.error('Create order error:', error);
+    res.status(500).json({ success: false, error: 'Failed to create payment order' });
+  }
+});
+
+// @route   POST /api/payments/verify
+// @desc    Verify Razorpay payment signature
+// @access  Private
+router.post('/verify', protect, async (req, res) => {
+  try {
+    const {
+      razorpay_order_id,
+      razorpay_payment_id,
+      razorpay_signature,
+      payment_record_id
+    } = req.body;
+
+    const secret = process.env.RAZORPAY_KEY_SECRET || 'secret_placeholder';
+
+    // Verify signature
+    const generated_signature = crypto
+      .createHmac('sha256', secret)
+      .update(razorpay_order_id + '|' + razorpay_payment_id)
+      .digest('hex');
+
+    if (generated_signature === razorpay_signature) {
+      // Payment is successful
+      const payment = await Payment.findById(payment_record_id);
+      if (!payment) return res.status(404).json({ success: false, error: 'Payment record not found' });
+
+      payment.razorpayPaymentId = razorpay_payment_id;
+      payment.razorpaySignature = razorpay_signature;
+      payment.status = 'successful';
+      
+      // Auto-generate a simple receipt URL placeholder
+      payment.receiptUrl = `/receipts/${payment._id}`;
+      await payment.save();
+
+      // If this is a rent payment, update Tenant dues
+      if (payment.tenant && payment.type === 'rent') {
+        const tenant = await Tenant.findById(payment.tenant);
+        if (tenant) {
+          tenant.paidAmount += payment.amount;
+          tenant.pendingAmount = Math.max(0, tenant.pendingAmount - payment.amount);
+          
+          // If fully paid, clear late fee and set next due date (e.g. 1 month later)
+          if (tenant.pendingAmount === 0) {
+            tenant.lateFee = 0;
+            // Next due date logic can be added here
+          }
+          await tenant.save();
+        }
+      }
+
+      // If it's the 5 INR contact unlock
+      if (payment.type === 'other' && payment.amount === 5) {
+        const user = await User.findById(req.user._id);
+        if (!user.unlockedHostels) user.unlockedHostels = [];
+        if (!user.unlockedHostels.includes(payment.hostel)) {
+          user.unlockedHostels.push(payment.hostel);
+          await user.save();
+        }
+      }
+
+      res.json({
+        success: true,
+        message: 'Payment verified successfully',
+        payment
+      });
+    } else {
+      res.status(400).json({ success: false, error: 'Invalid payment signature' });
+    }
+  } catch (error) {
+    console.error('Verify payment error:', error);
+    res.status(500).json({ success: false, error: 'Failed to verify payment' });
+  }
+});
+
+// @route   GET /api/payments/me
+// @desc    Get user's past payments/receipts
+// @access  Private
+router.get('/me', protect, async (req, res) => {
+  try {
+    const payments = await Payment.find({ student: req.user._id, status: 'successful' })
+      .populate('hostel', 'name')
+      .sort({ createdAt: -1 });
+    
+    res.json({ success: true, payments });
+  } catch (error) {
+    console.error('Fetch payments error:', error);
+    res.status(500).json({ success: false, error: 'Failed to fetch payment history' });
   }
 });
 
 // @route   POST /api/payments/verify-screenshot
-// @desc    Verify payment screenshot using OCR
-// @access  Private (Students only)
+// @desc    Verify payment screenshot for unlocking a hostel
+// @access  Private
 router.post('/verify-screenshot', protect, upload.single('screenshot'), async (req, res) => {
   try {
     const { hostelId } = req.body;
     
-    if (!hostelId) {
-      return res.status(400).json({ success: false, error: 'Hostel ID is required' });
+    if (!req.file || !hostelId) {
+      return res.status(400).json({ success: false, error: 'Screenshot and hostelId are required' });
     }
 
-    if (req.user.role !== 'student') {
-      return res.status(403).json({ success: false, error: 'Only students can unlock hostels' });
+    // Generate MD5 hash of the image buffer to simulate UTR extraction/deduplication
+    const utrCode = crypto.createHash('md5').update(req.file.buffer).digest('hex');
+
+    // Check for duplicate screenshot
+    const existingPayment = await Payment.findOne({ utrCode });
+    if (existingPayment) {
+      return res.status(400).json({ success: false, error: 'Duplicate screenshot detected. This payment has already been verified.' });
     }
 
-    if (!req.file) {
-      return res.status(400).json({ success: false, error: 'Screenshot image is required' });
-    }
+    // Find hostel to get owner ID
+    const hostel = await Hostel.findById(hostelId);
+    if (!hostel) return res.status(404).json({ success: false, error: 'Hostel not found' });
 
-    // Run Tesseract OCR on the image buffer
-    console.log('Running OCR on screenshot...');
-    const result = await tesseract.recognize(req.file.buffer, 'eng', {
-      logger: m => console.log(m.status, Math.round(m.progress * 100) + '%')
+    // Save payment record
+    const payment = await Payment.create({
+      student: req.user._id,
+      hostel: hostelId,
+      owner: hostel.owner,
+      amount: 5,
+      type: 'other',
+      razorpayOrderId: `mock_order_${Date.now()}`,
+      status: 'successful',
+      utrCode: utrCode
     });
-    
-    const extractedText = result.data.text;
-    console.log('Extracted text length:', extractedText.length);
-    
-    // Find any 12-digit numbers
-    const utrRegex = /\b\d{12}\b/g;
-    const matches = extractedText.match(utrRegex);
-    
-    if (!matches || matches.length === 0) {
-      return res.status(400).json({ success: false, error: 'Could not detect a 12-digit UTR in the screenshot. Please upload a clear payment success image.' });
-    }
 
-    // Use the first 12-digit number found
-    const detectedUtr = matches[0];
-    console.log('Detected UTR:', detectedUtr);
-
-    // Check uniqueness
-    const existingUtr = await UsedUTR.findOne({ utr: detectedUtr });
-    if (existingUtr) {
-      return res.status(400).json({ success: false, error: `UTR ${detectedUtr} has already been used. Please upload a unique payment screenshot.` });
-    }
-
+    // Unlock hostel for user
     const user = await User.findById(req.user._id);
-
-    if (user.unlockedHostels && user.unlockedHostels.includes(hostelId)) {
-      return res.status(400).json({ success: false, error: 'Hostel already unlocked' });
+    if (!user.unlockedHostels) user.unlockedHostels = [];
+    if (!user.unlockedHostels.includes(hostelId)) {
+      user.unlockedHostels.push(hostelId);
+      await user.save();
     }
-
-    // Save UTR and unlock hostel
-    const usedUtr = new UsedUTR({ utr: detectedUtr, userId: user._id, hostelId });
-    await usedUtr.save();
-
-    if (!user.unlockedHostels) {
-      user.unlockedHostels = [];
-    }
-    user.unlockedHostels.push(hostelId);
-    await user.save();
 
     res.json({
       success: true,
-      message: `Verified successfully (UTR: ${detectedUtr}). Details unlocked!`,
+      message: 'Screenshot verified. Contact details unlocked.',
+      payment,
       unlockedHostels: user.unlockedHostels
     });
 
   } catch (error) {
-    console.error('OCR Verification error:', error);
-    res.status(500).json({ success: false, error: 'Failed to verify screenshot using AI.' });
+    console.error('Verify screenshot error:', error);
+    res.status(500).json({ success: false, error: 'Failed to verify screenshot' });
+  }
+});
+
+// @route   POST /api/payments/scan-pay
+// @desc    Mock Scan & Pay flow
+// @access  Private
+router.post('/scan-pay', protect, async (req, res) => {
+  try {
+    const { amount, hostelId, type } = req.body;
+    
+    if (!amount || !hostelId) {
+      return res.status(400).json({ success: false, error: 'Amount and hostelId are required' });
+    }
+
+    const hostel = await Hostel.findById(hostelId);
+    if (!hostel) return res.status(404).json({ success: false, error: 'Hostel not found' });
+
+    // Mock Razorpay Order ID for receipt
+    const mockOrderId = `mock_order_${crypto.randomBytes(6).toString('hex')}`;
+    const mockPaymentId = `pay_${crypto.randomBytes(8).toString('hex')}`;
+
+    const payment = await Payment.create({
+      student: req.user._id,
+      hostel: hostelId,
+      owner: hostel.owner,
+      amount: parseInt(amount),
+      type: type || 'other',
+      razorpayOrderId: mockOrderId,
+      razorpayPaymentId: mockPaymentId,
+      status: 'successful',
+      receiptUrl: `/receipts/mock_${Date.now()}`
+    });
+
+    res.json({
+      success: true,
+      message: 'Payment verified successfully',
+      payment
+    });
+  } catch (error) {
+    console.error('Scan Pay error:', error);
+    res.status(500).json({ success: false, error: 'Failed to process scan and pay' });
   }
 });
 

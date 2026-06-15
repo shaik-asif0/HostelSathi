@@ -4,23 +4,101 @@ const Message = require('../models/Message');
 const Notification = require('../models/Notification');
 const { protect } = require('../middleware/auth');
 
-// @route   GET /api/messages/:hostelId
-// @desc    Get chat history for a hostel (between student and owner)
+// @route   GET /api/messages/conversations/list
+// @desc    Get all conversations for current user (list of unique threads)
 // @access  Private
-router.get('/:hostelId', protect, async (req, res) => {
+router.get('/conversations/list', protect, async (req, res) => {
   try {
-    const { hostelId } = req.params;
     const userId = req.user._id;
 
-    // Fetch all messages where user is sender or receiver for this hostel
-    const messages = await Message.find({
-      hostel: hostelId,
-      $or: [{ sender: userId }, { receiver: userId }]
-    }).sort({ createdAt: 1 }).limit(100);
+    const conversations = await Message.aggregate([
+      {
+        $match: {
+          $or: [{ sender: userId }, { receiver: userId }]
+        }
+      },
+      { $sort: { createdAt: -1 } },
+      {
+        $group: {
+          // Group by hostel AND the other user to isolate threads!
+          _id: {
+            hostel: '$hostel',
+            otherUser: {
+              $cond: [ { $eq: ['$sender', userId] }, '$receiver', '$sender' ]
+            }
+          },
+          lastMessage: { $first: '$$ROOT' },
+          unreadCount: {
+            $sum: {
+              $cond: [{ $and: [{ $eq: ['$receiver', userId] }, { $eq: ['$read', false] }] }, 1, 0]
+            }
+          }
+        }
+      },
+      {
+        $lookup: {
+          from: 'hostels',
+          localField: '_id.hostel',
+          foreignField: '_id',
+          as: 'hostelInfo'
+        }
+      },
+      {
+        $lookup: {
+          from: 'users',
+          localField: '_id.otherUser',
+          foreignField: '_id',
+          as: 'otherUserInfo'
+        }
+      },
+      { $unwind: { path: '$hostelInfo', preserveNullAndEmptyArrays: true } },
+      { $unwind: { path: '$otherUserInfo', preserveNullAndEmptyArrays: true } },
+      { $sort: { 'lastMessage.createdAt': -1 } }
+    ]);
+
+    // Format to match old output shape but with otherUser info included
+    const formattedConversations = conversations.map(c => ({
+      _id: c._id.hostel, // keep _id as hostel for frontend legacy reasons
+      otherUserId: c._id.otherUser,
+      otherUserName: c.otherUserInfo ? c.otherUserInfo.name : 'Unknown User',
+      hostelInfo: c.hostelInfo,
+      lastMessage: c.lastMessage,
+      unreadCount: c.unreadCount
+    }));
+
+    res.json({ success: true, conversations: formattedConversations });
+  } catch (error) {
+    console.error('Fetch conversations error:', error);
+    res.status(500).json({ success: false, error: 'Failed to fetch conversations' });
+  }
+});
+
+// @route   GET /api/messages/:hostelId/:studentId?
+// @desc    Get chat history for a hostel (between student and owner)
+// @access  Private
+router.get('/:hostelId/:studentId?', protect, async (req, res) => {
+  try {
+    const { hostelId, studentId } = req.params;
+    const userId = req.user._id;
+
+    const query = { hostel: hostelId };
+    
+    // If a specific studentId is provided (by owner), restrict thread to that user.
+    // Otherwise, assume it's the current user (student viewing owner's thread).
+    if (studentId) {
+      query.$or = [
+        { sender: userId, receiver: studentId },
+        { sender: studentId, receiver: userId }
+      ];
+    } else {
+      query.$or = [{ sender: userId }, { receiver: userId }];
+    }
+
+    const messages = await Message.find(query).sort({ createdAt: 1 }).limit(100);
 
     // Mark received messages as read
     await Message.updateMany(
-      { hostel: hostelId, receiver: userId, read: false },
+      { ...query, receiver: userId, read: false },
       { $set: { read: true } }
     );
 
@@ -67,49 +145,6 @@ router.post('/', protect, async (req, res) => {
   }
 });
 
-// @route   GET /api/messages/conversations/list
-// @desc    Get all conversations for current user (list of unique hostel threads)
-// @access  Private
-router.get('/conversations/list', protect, async (req, res) => {
-  try {
-    const userId = req.user._id;
-
-    // Get distinct hostel IDs the user has chatted in
-    const conversations = await Message.aggregate([
-      {
-        $match: {
-          $or: [{ sender: userId }, { receiver: userId }]
-        }
-      },
-      { $sort: { createdAt: -1 } },
-      {
-        $group: {
-          _id: '$hostel',
-          lastMessage: { $first: '$$ROOT' },
-          unreadCount: {
-            $sum: {
-              $cond: [{ $and: [{ $eq: ['$receiver', userId] }, { $eq: ['$read', false] }] }, 1, 0]
-            }
-          }
-        }
-      },
-      {
-        $lookup: {
-          from: 'hostels',
-          localField: '_id',
-          foreignField: '_id',
-          as: 'hostelInfo'
-        }
-      },
-      { $unwind: { path: '$hostelInfo', preserveNullAndEmptyArrays: true } }
-    ]);
-
-    res.json({ success: true, conversations });
-  } catch (error) {
-    console.error('Fetch conversations error:', error);
-    res.status(500).json({ success: false, error: 'Failed to fetch conversations' });
-  }
-});
 
 // @route   PUT /api/messages/:id/read
 // @desc    Mark a message as read

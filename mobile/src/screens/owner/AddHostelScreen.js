@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, TextInput, TouchableOpacity, ScrollView, SafeAr
 import { useSelector } from 'react-redux';
 import { launchImageLibrary } from 'react-native-image-picker';
 import { hostelsAPI, uploadAPI } from '../../api/apiClient';
+import Ionicons from 'react-native-vector-icons/Ionicons';
 
 // Real Hyderabad colleges for selection
 const HYD_COLLEGES = [
@@ -128,7 +129,7 @@ export default function AddHostelScreen({ route, navigation }) {
         selectionLimit: 0, // 0 = multiple
         quality: 0.8
       });
-      
+
       if (result.assets) {
         if (isFood) {
           setLocalFoodPhotos([...localFoodPhotos, ...result.assets]);
@@ -230,7 +231,7 @@ export default function AddHostelScreen({ route, navigation }) {
         : await hostelsAPI.create(payload);
 
       if (res.data.success) {
-        Alert.alert('✅ Success', isEditMode ? 'Hostel listing updated!' : 'New hostel listing created!');
+        Alert.alert('Success', isEditMode ? 'Hostel listing updated!' : 'New hostel listing created!');
         navigation.goBack();
       }
     } catch (err) {
@@ -244,17 +245,17 @@ export default function AddHostelScreen({ route, navigation }) {
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.scrollContent}>
-        
+
         <Text style={styles.title}>{isEditMode ? 'Edit Hostel Profile' : 'Add New Hostel Profile'}</Text>
 
-        <TextInput 
+        <TextInput
           placeholder="Hostel Name *"
           value={name}
           onChangeText={setName}
           style={styles.input}
           placeholderTextColor="#8b85a3"
         />
-        <TextInput 
+        <TextInput
           placeholder="Hostel Address *"
           value={address}
           onChangeText={setAddress}
@@ -266,7 +267,7 @@ export default function AddHostelScreen({ route, navigation }) {
         <View style={styles.row}>
           <View style={styles.halfCol}>
             <Text style={styles.label}>Longitude (lng)</Text>
-            <TextInput 
+            <TextInput
               value={lng}
               onChangeText={setLng}
               keyboardType="numeric"
@@ -275,7 +276,7 @@ export default function AddHostelScreen({ route, navigation }) {
           </View>
           <View style={styles.halfCol}>
             <Text style={styles.label}>Latitude (lat)</Text>
-            <TextInput 
+            <TextInput
               value={lat}
               onChangeText={setLat}
               keyboardType="numeric"
@@ -293,7 +294,10 @@ export default function AddHostelScreen({ route, navigation }) {
         />
 
         {/* College Quick-Select */}
-        <Text style={styles.subTitle}>📍 Select Nearby Colleges</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 16, marginBottom: 10, borderBottomWidth: 1, borderBottomColor: 'rgba(124, 58, 237, 0.08)', paddingBottom: 6 }}>
+          <Ionicons name="location" size={14} color="#1e1b29" style={{ marginRight: 6 }} />
+          <Text style={[styles.subTitle, { marginTop: 0, marginBottom: 0, borderBottomWidth: 0, paddingBottom: 0 }]}>Select Nearby Colleges</Text>
+        </View>
         <Text style={styles.hintText}>Tap to select — helps students filter by college</Text>
         <View style={styles.amenitiesGrid}>
           {HYD_COLLEGES.map(college => {
@@ -317,7 +321,7 @@ export default function AddHostelScreen({ route, navigation }) {
         <View style={styles.row}>
           <View style={styles.thirdCol}>
             <Text style={styles.label}>Single</Text>
-            <TextInput 
+            <TextInput
               value={rentSingle}
               onChangeText={setRentSingle}
               keyboardType="numeric"
@@ -326,7 +330,7 @@ export default function AddHostelScreen({ route, navigation }) {
           </View>
           <View style={styles.thirdCol}>
             <Text style={styles.label}>2-Sharing</Text>
-            <TextInput 
+            <TextInput
               value={rentSharing2}
               onChangeText={setRentSharing2}
               keyboardType="numeric"
@@ -335,7 +339,7 @@ export default function AddHostelScreen({ route, navigation }) {
           </View>
           <View style={styles.thirdCol}>
             <Text style={styles.label}>3-Sharing</Text>
-            <TextInput 
+            <TextInput
               value={rentSharing3}
               onChangeText={setRentSharing3}
               keyboardType="numeric"
@@ -346,7 +350,7 @@ export default function AddHostelScreen({ route, navigation }) {
         <View style={styles.row}>
           <View style={styles.thirdCol}>
             <Text style={styles.label}>4-Sharing</Text>
-            <TextInput 
+            <TextInput
               value={rentSharing4}
               onChangeText={setRentSharing4}
               keyboardType="numeric"
@@ -355,7 +359,7 @@ export default function AddHostelScreen({ route, navigation }) {
           </View>
           <View style={styles.thirdCol}>
             <Text style={styles.label}>5-Sharing</Text>
-            <TextInput 
+            <TextInput
               value={rentSharing5}
               onChangeText={setRentSharing5}
               keyboardType="numeric"
@@ -365,7 +369,10 @@ export default function AddHostelScreen({ route, navigation }) {
         </View>
 
         {/* Vacancy / Availability */}
-        <Text style={styles.subTitle}>🛏️ Available Vacancies</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 16, marginBottom: 10, borderBottomWidth: 1, borderBottomColor: 'rgba(124, 58, 237, 0.08)', paddingBottom: 6 }}>
+          <Ionicons name="bed" size={14} color="#1e1b29" style={{ marginRight: 6 }} />
+          <Text style={[styles.subTitle, { marginTop: 0, marginBottom: 0, borderBottomWidth: 0, paddingBottom: 0 }]}>Available Vacancies</Text>
+        </View>
         <Text style={styles.hintText}>Set current vacancies to help students see what's available</Text>
         <View style={styles.row}>
           <View style={styles.thirdCol}>
@@ -423,7 +430,10 @@ export default function AddHostelScreen({ route, navigation }) {
         </View>
 
         {/* Fees */}
-        <Text style={styles.subTitle}>💰 Security Deposit & Fees</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 16, marginBottom: 10, borderBottomWidth: 1, borderBottomColor: 'rgba(124, 58, 237, 0.08)', paddingBottom: 6 }}>
+          <Ionicons name="cash" size={14} color="#1e1b29" style={{ marginRight: 6 }} />
+          <Text style={[styles.subTitle, { marginTop: 0, marginBottom: 0, borderBottomWidth: 0, paddingBottom: 0 }]}>Security Deposit & Fees</Text>
+        </View>
         <Text style={styles.hintText}>Be transparent about your extra charges.</Text>
         <View style={styles.row}>
           <View style={styles.halfCol}>
@@ -461,7 +471,10 @@ export default function AddHostelScreen({ route, navigation }) {
         </View>
 
         {/* Rules */}
-        <Text style={styles.subTitle}>📜 House Rules & Policies</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 16, marginBottom: 10, borderBottomWidth: 1, borderBottomColor: 'rgba(124, 58, 237, 0.08)', paddingBottom: 6 }}>
+          <Ionicons name="document-text" size={14} color="#1e1b29" style={{ marginRight: 6 }} />
+          <Text style={[styles.subTitle, { marginTop: 0, marginBottom: 0, borderBottomWidth: 0, paddingBottom: 0 }]}>House Rules & Policies</Text>
+        </View>
         <Text style={styles.hintText}>Set clear expectations for your tenants.</Text>
         <Text style={styles.label}>Curfew Time</Text>
         <TextInput
@@ -470,18 +483,18 @@ export default function AddHostelScreen({ route, navigation }) {
           style={styles.input}
           placeholder="e.g. 10:00 PM or No curfew"
         />
-        
+
         <View style={styles.switchRow}>
           <Text style={styles.switchLabel}>Visitors Allowed</Text>
-          <Switch value={visitorsAllowed} onValueChange={setVisitorsAllowed} trackColor={{ false: '#eae6f5', true: '#7c3aed' }} />
+          <Switch value={visitorsAllowed} onValueChange={setVisitorsAllowed} trackColor={{ false: '#eae6f5', true: '#4F46E5' }} />
         </View>
         <View style={styles.switchRow}>
           <Text style={styles.switchLabel}>Smoking Allowed</Text>
-          <Switch value={smokingAllowed} onValueChange={setSmokingAllowed} trackColor={{ false: '#eae6f5', true: '#7c3aed' }} />
+          <Switch value={smokingAllowed} onValueChange={setSmokingAllowed} trackColor={{ false: '#eae6f5', true: '#4F46E5' }} />
         </View>
         <View style={styles.switchRow}>
           <Text style={styles.switchLabel}>Drinking Allowed</Text>
-          <Switch value={drinkingAllowed} onValueChange={setDrinkingAllowed} trackColor={{ false: '#eae6f5', true: '#7c3aed' }} />
+          <Switch value={drinkingAllowed} onValueChange={setDrinkingAllowed} trackColor={{ false: '#eae6f5', true: '#4F46E5' }} />
         </View>
 
         <Text style={styles.label}>Gender Suitability</Text>
@@ -502,10 +515,10 @@ export default function AddHostelScreen({ route, navigation }) {
         {/* Food */}
         <View style={styles.switchRow}>
           <Text style={styles.switchLabel}>Homely Food Included</Text>
-          <Switch 
+          <Switch
             value={foodIncluded}
             onValueChange={setFoodIncluded}
-            trackColor={{ false: '#eae6f5', true: '#7c3aed' }}
+            trackColor={{ false: '#eae6f5', true: '#4F46E5' }}
           />
         </View>
 
@@ -575,10 +588,10 @@ export default function AddHostelScreen({ route, navigation }) {
             <Text style={styles.switchLabel}>Upgrade to Premium Listing</Text>
             <Text style={{ fontSize: 11, color: '#8b85a3' }}>Appear at top of search lists for ₹499/mo</Text>
           </View>
-          <Switch 
+          <Switch
             value={isPremium}
             onValueChange={setIsPremium}
-            trackColor={{ false: '#eae6f5', true: '#7c3aed' }}
+            trackColor={{ false: '#eae6f5', true: '#4F46E5' }}
           />
         </View>
 
@@ -595,7 +608,7 @@ export default function AddHostelScreen({ route, navigation }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8f6fc',
+    backgroundColor: '#F9FAFB',
   },
   scrollContent: {
     padding: 20,
@@ -664,8 +677,8 @@ const styles = StyleSheet.create({
     marginHorizontal: 2,
   },
   genderBtnActive: {
-    backgroundColor: '#7c3aed',
-    borderColor: '#7c3aed',
+    backgroundColor: '#4F46E5',
+    borderColor: '#4F46E5',
   },
   genderBtnText: {
     fontSize: 11,
@@ -705,8 +718,8 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   amenityBtnActive: {
-    backgroundColor: '#7c3aed',
-    borderColor: '#7c3aed',
+    backgroundColor: '#4F46E5',
+    borderColor: '#4F46E5',
   },
   amenityText: {
     fontSize: 12,
@@ -717,7 +730,7 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
   btnSubmit: {
-    backgroundColor: '#7c3aed',
+    backgroundColor: '#4F46E5',
     padding: 14,
     borderRadius: 8,
     alignItems: 'center',
@@ -739,7 +752,7 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   uploadBtnText: {
-    color: '#7c3aed',
+    color: '#4F46E5',
     fontWeight: 'bold'
   },
   photoGrid: {

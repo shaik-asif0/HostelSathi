@@ -4,13 +4,15 @@ import {
   TextInput, ActivityIndicator, Alert, SafeAreaView, Modal, Dimensions, Linking
 } from 'react-native';
 import { launchImageLibrary } from 'react-native-image-picker';
-import { useSelector } from 'react-redux';
+import { useSelector, useDispatch } from 'react-redux';
+import { updateUser } from '../../redux/authSlice';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { hostelsAPI, reviewsAPI, enquiriesAPI, paymentsAPI, tenantsAPI } from '../../api/apiClient';
 
 const PHYSICAL_SERVER_IP = '192.168.1.37';
 const SCREEN_WIDTH = Dimensions.get('window').width;
 
-const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const ROOM_TYPES = [
   { id: 'any', label: 'Any Room' },
   { id: 'single', label: 'Single Room' },
@@ -20,6 +22,7 @@ const ROOM_TYPES = [
 
 export default function HostelDetailScreen({ route, navigation }) {
   const { hostelId } = route.params;
+  const dispatch = useDispatch();
   const { user, token, isAuthenticated } = useSelector(state => state.auth);
 
   const [hostel, setHostel] = useState(null);
@@ -33,6 +36,8 @@ export default function HostelDetailScreen({ route, navigation }) {
 
   // Review states
   const [userRating, setUserRating] = useState(5);
+  const [userSafetyScore, setUserSafetyScore] = useState(5);
+  const [userFoodRating, setUserFoodRating] = useState(5);
   const [userComment, setUserComment] = useState('');
   const [reviewSubmitting, setReviewSubmitting] = useState(false);
 
@@ -75,7 +80,7 @@ export default function HostelDetailScreen({ route, navigation }) {
         setHostel(h);
         setEnquiryMessage(`Hi ${h.ownerName} garu! I'm interested in visiting "${h.name}". Can you please share room availability and visiting time?`);
         // Track view silently
-        hostelsAPI.trackView(hostelId).catch(() => {});
+        hostelsAPI.trackView(hostelId).catch(() => { });
       }
       const reviewsRes = await reviewsAPI.getByHostelId(hostelId);
       if (reviewsRes.data.success) setReviews(reviewsRes.data.reviews);
@@ -103,7 +108,13 @@ export default function HostelDetailScreen({ route, navigation }) {
     }
     setReviewSubmitting(true);
     try {
-      const res = await reviewsAPI.create({ hostelId, rating: userRating, comment: userComment });
+      const res = await reviewsAPI.create({
+        hostelId,
+        rating: userRating,
+        safetyScore: userSafetyScore,
+        foodRating: userFoodRating,
+        comment: userComment
+      });
       if (res.data.success) {
         setUserComment('');
         Alert.alert('✅ Review Submitted!', 'Thank you for your feedback.');
@@ -198,7 +209,10 @@ export default function HostelDetailScreen({ route, navigation }) {
         setPaymentModalVisible(false);
         setPaymentStep('initial');
         setLocalUnlocked(true);
-        // Also update redux state or refetch user if needed, but localUnlocked handles UI
+        // FIX: Update redux state and AsyncStorage so unlocked hostels persist across app restarts!
+        const updatedUser = { ...user, unlockedHostels: res.data.unlockedHostels };
+        dispatch(updateUser({ unlockedHostels: res.data.unlockedHostels }));
+        AsyncStorage.setItem('userData', JSON.stringify(updatedUser));
       }
     } catch (err) {
       console.error(err);
@@ -228,7 +242,7 @@ export default function HostelDetailScreen({ route, navigation }) {
         type: photo.type || 'image/jpeg'
       });
       formData.append('hostelId', hostel._id);
-      
+
       // Determine Rent Amount based on selectedRoomType
       let rentAmt = 0;
       if (selectedRoomType === 'single' || selectedRoomType === 'Single Room') rentAmt = hostel.rent.single;
@@ -325,7 +339,7 @@ export default function HostelDetailScreen({ route, navigation }) {
   if (loading) {
     return (
       <View style={styles.loadingBox}>
-        <ActivityIndicator size="large" color="#7c3aed" />
+        <ActivityIndicator size="large" color="#2874f0" />
         <Text style={styles.loadingText}>Loading hostel details...</Text>
       </View>
     );
@@ -422,6 +436,18 @@ export default function HostelDetailScreen({ route, navigation }) {
               <Text style={styles.ratingValue}>{hostel.rating > 0 ? hostel.rating.toFixed(1) : 'New'}</Text>
               <Text style={styles.ratingCount}>({hostel.reviewCount})</Text>
             </View>
+            {hostel.safetyScore > 0 && (
+              <View style={styles.ratingPill}>
+                <Text style={styles.ratingStarIcon}>🛡️</Text>
+                <Text style={styles.ratingValue}>{hostel.safetyScore}</Text>
+              </View>
+            )}
+            {hostel.foodRating > 0 && (
+              <View style={styles.ratingPill}>
+                <Text style={styles.ratingStarIcon}>🍽️</Text>
+                <Text style={styles.ratingValue}>{hostel.foodRating}</Text>
+              </View>
+            )}
           </View>
 
           {/* Quick Info Pills */}
@@ -471,8 +497,8 @@ export default function HostelDetailScreen({ route, navigation }) {
           </TouchableOpacity>
 
           {hostel.paymentUpiId && (
-            <TouchableOpacity 
-              style={[styles.btnBook, { backgroundColor: '#10b981', marginTop: 16 }]} 
+            <TouchableOpacity
+              style={[styles.btnBook, { backgroundColor: '#10b981', marginTop: 16 }]}
               onPress={() => {
                 if (!isAuthenticated) {
                   Alert.alert('Login Required', 'Please log in to join hostel');
@@ -499,8 +525,8 @@ export default function HostelDetailScreen({ route, navigation }) {
               { label: '4-Sharing', icon: '🛏️x4', val: hostel.rent.sharing4, vacancies: hostel.availability?.sharing4Vacancy },
               { label: '5-Sharing', icon: '🛏️x5', val: hostel.rent.sharing5, vacancies: hostel.availability?.sharing5Vacancy }
             ].filter(p => p.val > 0).map(p => (
-              <TouchableOpacity 
-                key={p.label} 
+              <TouchableOpacity
+                key={p.label}
                 style={[styles.premiumPriceCard, selectedRoomType === p.label && styles.premiumPriceCardSelected]}
                 onPress={() => setSelectedRoomType(p.label)}
                 activeOpacity={0.8}
@@ -702,7 +728,7 @@ export default function HostelDetailScreen({ route, navigation }) {
                   multiline
                   numberOfLines={3}
                   style={styles.messageInput}
-                  placeholderTextColor="#a09abc"
+                  placeholderTextColor="#878787"
                 />
 
                 <TouchableOpacity
@@ -731,15 +757,34 @@ export default function HostelDetailScreen({ route, navigation }) {
                     <Text style={[styles.starIcon, s <= userRating && styles.starIconActive]}>★</Text>
                   </TouchableOpacity>
                 ))}
-                <Text style={styles.ratingLabel}>{userRating}/5 stars</Text>
+                <Text style={styles.ratingLabel}>{userRating}/5 Overall</Text>
               </View>
+
+              <View style={styles.starsRow}>
+                {[1, 2, 3, 4, 5].map(s => (
+                  <TouchableOpacity key={s} onPress={() => setUserSafetyScore(s)}>
+                    <Text style={[styles.starIcon, s <= userSafetyScore && { color: '#10b981' }]}>🛡️</Text>
+                  </TouchableOpacity>
+                ))}
+                <Text style={styles.ratingLabel}>{userSafetyScore}/5 Safety</Text>
+              </View>
+
+              <View style={styles.starsRow}>
+                {[1, 2, 3, 4, 5].map(s => (
+                  <TouchableOpacity key={s} onPress={() => setUserFoodRating(s)}>
+                    <Text style={[styles.starIcon, s <= userFoodRating && { color: '#f59e0b' }]}>🍽️</Text>
+                  </TouchableOpacity>
+                ))}
+                <Text style={styles.ratingLabel}>{userFoodRating}/5 Food</Text>
+              </View>
+
               <TextInput
                 placeholder="Share your experience — food, safety, management..."
                 value={userComment}
                 onChangeText={setUserComment}
                 style={styles.commentInput}
                 multiline
-                placeholderTextColor="#a09abc"
+                placeholderTextColor="#878787"
               />
               <TouchableOpacity
                 style={styles.btnSubmitReview}
@@ -808,9 +853,9 @@ export default function HostelDetailScreen({ route, navigation }) {
       </Modal>
 
       {/* Payment Paywall Modal */}
-      <Modal 
-        visible={paymentModalVisible} 
-        transparent 
+      <Modal
+        visible={paymentModalVisible}
+        transparent
         animationType="slide"
         onRequestClose={() => {
           if (!processingPayment) {
@@ -826,7 +871,7 @@ export default function HostelDetailScreen({ route, navigation }) {
                 <Text style={styles.paymentModalIcon}>💳</Text>
                 <Text style={styles.paymentModalTitle}>Unlock Contact Details</Text>
                 <Text style={styles.paymentModalDesc}>
-                  Pay just <Text style={{fontWeight:'bold',color:'#7c3aed'}}>₹5</Text> to instantly unlock the owner's phone number, WhatsApp, Map location, and Chat feature.
+                  Pay just <Text style={{ fontWeight: 'bold', color: '#2874f0' }}>₹5</Text> to instantly unlock the owner's phone number, WhatsApp, Map location, and Chat feature.
                 </Text>
                 <View style={styles.paymentActionRow}>
                   <TouchableOpacity style={styles.payBtn} onPress={handleInitialPayClick}>
@@ -841,17 +886,17 @@ export default function HostelDetailScreen({ route, navigation }) {
               <>
                 <Text style={styles.paymentModalTitle}>Scan to Unlock</Text>
                 <Text style={styles.paymentModalDesc}>
-                  Scan and pay exactly <Text style={{fontWeight:'bold',color:'#7c3aed'}}>₹5.00</Text>. Then upload the payment success screenshot.
+                  Scan and pay exactly <Text style={{ fontWeight: 'bold', color: '#2874f0' }}>₹5.00</Text>. Then upload the payment success screenshot.
                 </Text>
-                
-                <Image 
+
+                <Image
                   source={{ uri: `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent('upi://pay?pa=hostelsathi@ybl&pn=HostelSathi&am=5.00&cu=INR')}` }}
                   style={styles.qrCodeImage}
                 />
 
                 {processingPayment ? (
                   <View style={styles.paymentProcessing}>
-                    <ActivityIndicator size="large" color="#7c3aed" />
+                    <ActivityIndicator size="large" color="#2874f0" />
                     <Text style={styles.paymentProcessingText}>AI is verifying your screenshot...</Text>
                   </View>
                 ) : (
@@ -897,7 +942,7 @@ export default function HostelDetailScreen({ route, navigation }) {
             </View>
             {/* Day Headers */}
             <View style={styles.dayHeaders}>
-              {['Su','Mo','Tu','We','Th','Fr','Sa'].map(d => (
+              {['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'].map(d => (
                 <Text key={d} style={styles.dayHeader}>{d}</Text>
               ))}
             </View>
@@ -916,9 +961,9 @@ export default function HostelDetailScreen({ route, navigation }) {
       </Modal>
 
       {/* Join & Pay Rent Modal */}
-      <Modal 
-        visible={joinModalVisible} 
-        transparent 
+      <Modal
+        visible={joinModalVisible}
+        transparent
         animationType="slide"
         onRequestClose={() => {
           if (!processingJoin) {
@@ -956,9 +1001,9 @@ export default function HostelDetailScreen({ route, navigation }) {
                 <Text style={[styles.paymentModalDesc, { marginBottom: 15 }]}>
                   Scan this code to pay the rent to: {hostel?.paymentUpiId}
                 </Text>
-                <Image 
-                  source={{ uri: `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=upi://pay?pa=${hostel?.paymentUpiId}&pn=${hostel?.ownerName}&cu=INR` }} 
-                  style={styles.qrCodeImage} 
+                <Image
+                  source={{ uri: `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=upi://pay?pa=${hostel?.paymentUpiId}&pn=${hostel?.ownerName}&cu=INR` }}
+                  style={styles.qrCodeImage}
                 />
                 <View style={styles.paymentActionRow}>
                   <TouchableOpacity style={styles.uploadBtn} onPress={handleUploadJoinScreenshot}>
@@ -979,12 +1024,12 @@ export default function HostelDetailScreen({ route, navigation }) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f8f6fc' },
+  container: { flex: 1, backgroundColor: '#f1f3f6' },
   scrollContent: { paddingBottom: 40 },
   loadingBox: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 12 },
-  loadingText: { color: '#8b85a3', fontSize: 14 },
+  loadingText: { color: '#878787', fontSize: 14 },
   emptyBox: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  emptyText: { color: '#8b85a3', fontSize: 14 },
+  emptyText: { color: '#878787', fontSize: 14 },
   // Gallery
   galleryHero: { position: 'relative' },
   heroImage: { width: SCREEN_WIDTH, height: 260 },
@@ -1038,8 +1083,8 @@ const styles = StyleSheet.create({
     padding: 20
   },
   titleRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 },
-  hostelName: { fontSize: 22, fontWeight: 'bold', color: '#1e1b29', marginBottom: 4 },
-  hostelAddress: { fontSize: 13, color: '#8b85a3', lineHeight: 18 },
+  hostelName: { fontSize: 22, fontWeight: 'bold', color: '#212121', marginBottom: 4 },
+  hostelAddress: { fontSize: 13, color: '#878787', lineHeight: 18 },
   ratingPill: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1064,12 +1109,12 @@ const styles = StyleSheet.create({
   },
   infoPillText: { fontSize: 12, color: '#5f5a75', fontWeight: '600' },
   collegesRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 6, marginBottom: 16, paddingBottom: 16, borderBottomWidth: 1, borderBottomColor: 'rgba(124,58,237,0.08)' },
-  collegesLabel: { fontSize: 12, color: '#7c3aed', fontWeight: 'bold', flexShrink: 0 },
+  collegesLabel: { fontSize: 12, color: '#2874f0', fontWeight: 'bold', flexShrink: 0 },
   collegesText: { fontSize: 12, color: '#5f5a75', flex: 1, lineHeight: 18 },
   actionBtns: { flexDirection: 'row', gap: 10, marginBottom: 20 },
   actionBtnChat: {
     flex: 1,
-    backgroundColor: '#7c3aed',
+    backgroundColor: '#2874f0',
     paddingVertical: 13,
     borderRadius: 12,
     alignItems: 'center'
@@ -1084,7 +1129,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#c4b5fd'
   },
-  actionBtnMapText: { color: '#7c3aed', fontWeight: 'bold', fontSize: 13 },
+  actionBtnMapText: { color: '#2874f0', fontWeight: 'bold', fontSize: 13 },
   actionBtnCall: {
     width: 68,
     backgroundColor: '#ecfdf5',
@@ -1105,8 +1150,8 @@ const styles = StyleSheet.create({
     marginBottom: 16
   },
   whatsappBtnText: { color: '#15803d', fontWeight: 'bold', fontSize: 13 },
-  sectionTitle: { fontSize: 16, fontWeight: 'bold', color: '#1e1b29', marginTop: 20, marginBottom: 12 },
-  
+  sectionTitle: { fontSize: 16, fontWeight: 'bold', color: '#212121', marginTop: 20, marginBottom: 12 },
+
   // Premium Pricing Cards
   pricingList: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, justifyContent: 'space-between', marginBottom: 16 },
   premiumPriceCard: {
@@ -1116,17 +1161,17 @@ const styles = StyleSheet.create({
     padding: 14,
     borderWidth: 2,
     borderColor: 'rgba(124,58,237,0.06)',
-    shadowColor: '#7c3aed',
+    shadowColor: '#2874f0',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.04,
     shadowRadius: 8,
     elevation: 2,
     marginBottom: 4
   },
-  premiumPriceCardSelected: { borderColor: '#7c3aed', backgroundColor: '#faf8ff' },
+  premiumPriceCardSelected: { borderColor: '#2874f0', backgroundColor: '#faf8ff' },
   premiumPriceTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 },
   premiumPriceIcon: { fontSize: 20 },
-  premiumPriceLabel: { fontSize: 13, fontWeight: 'bold', color: '#1e1b29', marginBottom: 4 },
+  premiumPriceLabel: { fontSize: 13, fontWeight: 'bold', color: '#212121', marginBottom: 4 },
   vacancyPill: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 8 },
   vacancyPillAvailable: { backgroundColor: '#d1fae5' },
   vacancyPillFull: { backgroundColor: '#fee2e2' },
@@ -1134,8 +1179,8 @@ const styles = StyleSheet.create({
   vacancyPillTextAvailable: { color: '#059669' },
   vacancyPillTextFull: { color: '#dc2626' },
   premiumPriceBottom: { flexDirection: 'row', alignItems: 'flex-end', gap: 2 },
-  premiumPriceVal: { fontSize: 16, fontWeight: '900', color: '#7c3aed' },
-  premiumPriceUnit: { fontSize: 11, color: '#8b85a3', marginBottom: 2 },
+  premiumPriceVal: { fontSize: 16, fontWeight: '900', color: '#2874f0' },
+  premiumPriceUnit: { fontSize: 11, color: '#878787', marginBottom: 2 },
 
   distanceCard: {
     backgroundColor: 'rgba(124,58,237,0.03)',
@@ -1145,19 +1190,19 @@ const styles = StyleSheet.create({
     padding: 16,
     marginBottom: 16
   },
-  distanceTitle: { fontSize: 14, fontWeight: 'bold', color: '#1e1b29', marginBottom: 4 },
-  distanceKm: { fontSize: 12, color: '#8b85a3', marginBottom: 12 },
+  distanceTitle: { fontSize: 14, fontWeight: 'bold', color: '#212121', marginBottom: 4 },
+  distanceKm: { fontSize: 12, color: '#878787', marginBottom: 12 },
   distanceRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   distanceItem: { alignItems: 'center', flex: 1 },
   distanceIcon: { fontSize: 20, marginBottom: 4 },
   distanceName: { fontSize: 11, color: '#5f5a75', fontWeight: '600' },
-  distanceDuration: { fontSize: 10, color: '#a09abc', marginTop: 2 },
+  distanceDuration: { fontSize: 10, color: '#878787', marginTop: 2 },
   distanceDivider: { width: 1, height: 30, backgroundColor: 'rgba(124,58,237,0.1)' },
   amenitiesGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 20 },
-  amenityPill: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#f8f6fc', paddingVertical: 8, paddingHorizontal: 12, borderRadius: 8, borderWidth: 1, borderColor: 'rgba(124,58,237,0.08)' },
+  amenityPill: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#f1f3f6', paddingVertical: 8, paddingHorizontal: 12, borderRadius: 8, borderWidth: 1, borderColor: 'rgba(124,58,237,0.08)' },
   amenityCheck: { color: '#10b981', fontWeight: 'bold', fontSize: 12 },
-  amenityText: { fontSize: 12, color: '#1e1b29', fontWeight: '500' },
-  noDataText: { fontSize: 13, color: '#8b85a3', fontStyle: 'italic' },
+  amenityText: { fontSize: 12, color: '#212121', fontWeight: '500' },
+  noDataText: { fontSize: 13, color: '#878787', fontStyle: 'italic' },
   // Fees
   feesCard: {
     backgroundColor: '#faf8ff',
@@ -1169,7 +1214,7 @@ const styles = StyleSheet.create({
   },
   feeRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 },
   feeLabel: { fontSize: 13, color: '#5f5a75' },
-  feeVal: { fontSize: 14, fontWeight: 'bold', color: '#1e1b29' },
+  feeVal: { fontSize: 14, fontWeight: 'bold', color: '#212121' },
   // Rules
   rulesGrid: {
     flexDirection: 'row',
@@ -1189,8 +1234,8 @@ const styles = StyleSheet.create({
     gap: 10
   },
   ruleIcon: { fontSize: 20 },
-  ruleLabel: { fontSize: 11, color: '#8b85a3' },
-  ruleVal: { fontSize: 13, fontWeight: 'bold', color: '#1e1b29' },
+  ruleLabel: { fontSize: 11, color: '#878787' },
+  ruleVal: { fontSize: 13, fontWeight: 'bold', color: '#212121' },
   ruleValDisabled: { color: '#ef4444' },
   bookingBox: {
     borderColor: 'rgba(124,58,237,0.15)',
@@ -1198,13 +1243,13 @@ const styles = StyleSheet.create({
     padding: 16,
     marginBottom: 16
   },
-  distanceTitle: { fontSize: 13, fontWeight: 'bold', color: '#1e1b29', marginBottom: 4 },
+  distanceTitle: { fontSize: 13, fontWeight: 'bold', color: '#212121', marginBottom: 4 },
   distanceKm: { fontSize: 11, color: '#5f5a75', marginBottom: 12 },
   distanceRow: { flexDirection: 'row', justifyContent: 'space-around' },
   distanceItem: { alignItems: 'center', flex: 1 },
   distanceIcon: { fontSize: 22, marginBottom: 4 },
-  distanceName: { fontSize: 11, color: '#8b85a3' },
-  distanceDuration: { fontSize: 13, fontWeight: 'bold', color: '#7c3aed' },
+  distanceName: { fontSize: 11, color: '#878787' },
+  distanceDuration: { fontSize: 13, fontWeight: 'bold', color: '#2874f0' },
   distanceDivider: { width: 1, backgroundColor: 'rgba(124,58,237,0.15)' },
   amenitiesGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 16 },
   amenityPill: {
@@ -1220,7 +1265,7 @@ const styles = StyleSheet.create({
   },
   amenityCheck: { color: '#10b981', fontWeight: 'bold', fontSize: 12 },
   amenityText: { fontSize: 12, color: '#059669', fontWeight: '600' },
-  noDataText: { color: '#a09abc', fontSize: 13, paddingVertical: 8 },
+  noDataText: { color: '#878787', fontSize: 13, paddingVertical: 8 },
   bookingBox: {
     borderWidth: 2,
     borderColor: 'rgba(124,58,237,0.2)',
@@ -1229,7 +1274,7 @@ const styles = StyleSheet.create({
     marginTop: 16,
     backgroundColor: 'rgba(124,58,237,0.01)'
   },
-  bookingTitle: { fontSize: 16, fontWeight: 'bold', color: '#1e1b29', marginBottom: 14 },
+  bookingTitle: { fontSize: 16, fontWeight: 'bold', color: '#212121', marginBottom: 14 },
   bookingLabel: { fontSize: 12, fontWeight: 'bold', color: '#5f5a75', marginBottom: 8, marginTop: 12 },
   roomTypeRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   roomTypeBtn: {
@@ -1238,15 +1283,15 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     borderWidth: 1,
     borderColor: 'rgba(124,58,237,0.2)',
-    backgroundColor: '#f8f6fc'
+    backgroundColor: '#f1f3f6'
   },
-  roomTypeBtnActive: { backgroundColor: '#7c3aed', borderColor: '#7c3aed' },
+  roomTypeBtnActive: { backgroundColor: '#2874f0', borderColor: '#2874f0' },
   roomTypeBtnText: { fontSize: 12, color: '#5f5a75', fontWeight: '600' },
   roomTypeBtnTextActive: { color: '#ffffff' },
   datePickerBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#f8f6fc',
+    backgroundColor: '#f1f3f6',
     borderWidth: 1,
     borderColor: 'rgba(124,58,237,0.2)',
     borderRadius: 10,
@@ -1256,11 +1301,11 @@ const styles = StyleSheet.create({
   },
   datePickerIcon: { fontSize: 16 },
   datePickerText: { flex: 1, fontSize: 14, color: '#5f5a75' },
-  dateClearBtn: { color: '#a09abc', fontSize: 14, fontWeight: 'bold' },
+  dateClearBtn: { color: '#878787', fontSize: 14, fontWeight: 'bold' },
   messageInput: {
     borderWidth: 1,
     borderColor: 'rgba(124,58,237,0.15)',
-    backgroundColor: '#f8f6fc',
+    backgroundColor: '#f1f3f6',
     padding: 12,
     fontSize: 13,
     color: '#2d2a3a',
@@ -1269,7 +1314,7 @@ const styles = StyleSheet.create({
     minHeight: 70
   },
   btnBook: {
-    backgroundColor: '#7c3aed',
+    backgroundColor: '#2874f0',
     padding: 14,
     borderRadius: 12,
     alignItems: 'center',
@@ -1282,25 +1327,25 @@ const styles = StyleSheet.create({
   successText: { fontSize: 14, color: '#2d2a3a', marginTop: 3 },
   chatSuccessBtn: {
     marginTop: 14,
-    backgroundColor: '#7c3aed',
+    backgroundColor: '#2874f0',
     paddingVertical: 10,
     paddingHorizontal: 20,
     borderRadius: 50
   },
   chatSuccessBtnText: { color: '#ffffff', fontWeight: 'bold', fontSize: 13 },
   writeReviewBox: {
-    backgroundColor: '#f8f6fc',
+    backgroundColor: '#f1f3f6',
     borderRadius: 12,
     padding: 14,
     marginBottom: 16,
     borderWidth: 1,
     borderColor: 'rgba(124,58,237,0.1)'
   },
-  writeReviewTitle: { fontSize: 14, fontWeight: 'bold', color: '#1e1b29', marginBottom: 10 },
+  writeReviewTitle: { fontSize: 14, fontWeight: 'bold', color: '#212121', marginBottom: 10 },
   starsRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 10 },
   starIcon: { fontSize: 26, color: '#d1c7f0' },
   starIconActive: { color: '#f59e0b' },
-  ratingLabel: { fontSize: 12, color: '#8b85a3', marginLeft: 4 },
+  ratingLabel: { fontSize: 12, color: '#878787', marginLeft: 4 },
   commentInput: {
     backgroundColor: '#ffffff',
     borderWidth: 1,
@@ -1314,7 +1359,7 @@ const styles = StyleSheet.create({
     textAlignVertical: 'top'
   },
   btnSubmitReview: {
-    backgroundColor: '#7c3aed',
+    backgroundColor: '#2874f0',
     paddingVertical: 10,
     paddingHorizontal: 18,
     borderRadius: 8,
@@ -1331,18 +1376,18 @@ const styles = StyleSheet.create({
     width: 34,
     height: 34,
     borderRadius: 17,
-    backgroundColor: '#7c3aed',
+    backgroundColor: '#2874f0',
     alignItems: 'center',
     justifyContent: 'center'
   },
   reviewAvatarText: { color: '#ffffff', fontWeight: 'bold', fontSize: 14 },
-  reviewUser: { fontWeight: 'bold', color: '#1e1b29', fontSize: 13 },
-  reviewDate: { fontSize: 11, color: '#a09abc', marginTop: 1 },
+  reviewUser: { fontWeight: 'bold', color: '#212121', fontSize: 13 },
+  reviewDate: { fontSize: 11, color: '#878787', marginTop: 1 },
   reviewStarsBox: {},
   reviewStars: { color: '#f59e0b', fontSize: 14 },
   reviewComment: { fontSize: 13, color: '#5f5a75', lineHeight: 20 },
   noReviewsBox: { paddingVertical: 20, alignItems: 'center' },
-  noReviewsText: { color: '#a09abc', fontSize: 13 },
+  noReviewsText: { color: '#878787', fontSize: 13 },
   // Full-screen Gallery Modal
   galleryModal: {
     flex: 1,
@@ -1382,17 +1427,17 @@ const styles = StyleSheet.create({
     padding: 20,
     paddingBottom: 36
   },
-  dateModalTitle: { fontSize: 18, fontWeight: 'bold', color: '#1e1b29', textAlign: 'center', marginBottom: 16 },
+  dateModalTitle: { fontSize: 18, fontWeight: 'bold', color: '#212121', textAlign: 'center', marginBottom: 16 },
   monthNav: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
-  monthNavArrow: { fontSize: 28, color: '#7c3aed', fontWeight: 'bold', paddingHorizontal: 12 },
-  monthLabel: { fontSize: 16, fontWeight: 'bold', color: '#1e1b29' },
+  monthNavArrow: { fontSize: 28, color: '#2874f0', fontWeight: 'bold', paddingHorizontal: 12 },
+  monthLabel: { fontSize: 16, fontWeight: 'bold', color: '#212121' },
   dayHeaders: { flexDirection: 'row', marginBottom: 8 },
-  dayHeader: { flex: 1, textAlign: 'center', fontSize: 12, color: '#8b85a3', fontWeight: 'bold' },
+  dayHeader: { flex: 1, textAlign: 'center', fontSize: 12, color: '#878787', fontWeight: 'bold' },
   calendarGrid: { flexDirection: 'row', flexWrap: 'wrap' },
   dayCell: { width: `${100 / 7}%`, aspectRatio: 1, alignItems: 'center', justifyContent: 'center' },
-  dayCellSelected: { backgroundColor: '#7c3aed', borderRadius: 50 },
+  dayCellSelected: { backgroundColor: '#2874f0', borderRadius: 50 },
   dayCellPast: { opacity: 0.3 },
-  dayText: { fontSize: 14, color: '#1e1b29', fontWeight: '500' },
+  dayText: { fontSize: 14, color: '#212121', fontWeight: '500' },
   dayTextSelected: { color: '#ffffff', fontWeight: 'bold' },
   dayTextPast: { color: '#c4b5fd' },
   dateModalClose: {
@@ -1403,20 +1448,20 @@ const styles = StyleSheet.create({
     borderTopColor: 'rgba(124,58,237,0.1)'
   },
   dateModalCloseText: { color: '#ef4444', fontWeight: 'bold', fontSize: 14 },
-  
+
   // Payment Modal
   paymentModalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' },
   paymentModal: { backgroundColor: '#ffffff', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, alignItems: 'center' },
   paymentModalIcon: { fontSize: 48, marginBottom: 16 },
-  paymentModalTitle: { fontSize: 20, fontWeight: '900', color: '#1e1b29', marginBottom: 10 },
+  paymentModalTitle: { fontSize: 20, fontWeight: '900', color: '#212121', marginBottom: 10 },
   paymentModalDesc: { fontSize: 14, color: '#5f5a75', textAlign: 'center', lineHeight: 22, marginBottom: 20, paddingHorizontal: 10 },
   paymentProcessing: { alignItems: 'center', paddingVertical: 20 },
-  paymentProcessingText: { fontSize: 14, color: '#7c3aed', fontWeight: '600', marginTop: 12 },
+  paymentProcessingText: { fontSize: 14, color: '#2874f0', fontWeight: '600', marginTop: 12 },
   paymentActionRow: { width: '100%', gap: 12 },
-  payBtn: { backgroundColor: '#7c3aed', paddingVertical: 14, borderRadius: 12, alignItems: 'center', width: '100%' },
+  payBtn: { backgroundColor: '#2874f0', paddingVertical: 14, borderRadius: 12, alignItems: 'center', width: '100%' },
   payBtnText: { color: '#ffffff', fontSize: 15, fontWeight: 'bold' },
   uploadBtn: { backgroundColor: '#10b981', paddingVertical: 14, borderRadius: 12, alignItems: 'center', width: '100%' },
   payCancelBtn: { paddingVertical: 12, alignItems: 'center', width: '100%' },
-  payCancelText: { color: '#8b85a3', fontSize: 14, fontWeight: 'bold' },
+  payCancelText: { color: '#878787', fontSize: 14, fontWeight: 'bold' },
   qrCodeImage: { width: 160, height: 160, marginBottom: 20 }
 });

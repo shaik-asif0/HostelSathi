@@ -4,6 +4,7 @@ import {
   ScrollView, SafeAreaView, ActivityIndicator, Alert, Modal, RefreshControl, TextInput
 } from 'react-native';
 import { useSelector } from 'react-redux';
+import Ionicons from 'react-native-vector-icons/Ionicons';
 import apiClient from '../../api/apiClient';
 
 const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -109,7 +110,7 @@ export default function DashboardScreen({ navigation }) {
         sharing2Vacancy: parseInt(quickVacancies.sharing2) || 0,
         sharing3Vacancy: parseInt(quickVacancies.sharing3) || 0,
       };
-      const res = await apiClient.put(`/hostels/${selectedHostelForUpdate._id}`, payload);
+      const res = await apiClient.put(`/hostels/${selectedHostelForUpdate._id}/vacancies`, payload);
       if (res.data.success) {
         setQuickUpdateModalVisible(false);
         fetchDashboardData();
@@ -162,7 +163,8 @@ export default function DashboardScreen({ navigation }) {
   const handleRemoveTenant = async (tenantId) => {
     Alert.alert('Remove Student', 'Are you sure you want to permanently remove this student?', [
       { text: 'Cancel', style: 'cancel' },
-      { text: 'Remove', style: 'destructive', onPress: async () => {
+      {
+        text: 'Remove', style: 'destructive', onPress: async () => {
           try {
             const res = await apiClient.put(`/tenants/${tenantId}/remove`);
             if (res.data.success) {
@@ -172,7 +174,8 @@ export default function DashboardScreen({ navigation }) {
           } catch (err) {
             Alert.alert('Error', 'Failed to remove student');
           }
-      }}
+        }
+      }
     ]);
   };
 
@@ -220,7 +223,7 @@ export default function DashboardScreen({ navigation }) {
   const totalViews = Object.values(analyticsMap).reduce((s, a) => s + (a.totalViews || 0), 0);
 
   // Inline mini sparkline bar chart component
-  const SparkLine = ({ data, color = '#7c3aed' }) => {
+  const SparkLine = ({ data, color = '#4F46E5' }) => {
     const max = Math.max(...data, 1);
     return (
       <View style={styles.sparkline}>
@@ -235,12 +238,15 @@ export default function DashboardScreen({ navigation }) {
   };
 
   // Funnel step component
-  const FunnelStep = ({ label, count, total, color }) => {
+  const FunnelStep = ({ icon, label, count, total, color }) => {
     const pct = total > 0 ? Math.round((count / total) * 100) : 0;
     return (
       <View style={styles.funnelStep}>
         <View style={styles.funnelLabelRow}>
-          <Text style={styles.funnelLabel}>{label}</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            <Ionicons name={icon} size={12} color={color} style={{ marginRight: 4 }} />
+            <Text style={styles.funnelLabel}>{label}</Text>
+          </View>
           <Text style={[styles.funnelCount, { color }]}>{count}</Text>
         </View>
         <View style={styles.funnelBarBg}>
@@ -257,9 +263,12 @@ export default function DashboardScreen({ navigation }) {
         <View style={{ flex: 1 }}>
           <View style={styles.cardTitleRow}>
             <Text style={styles.cardName} numberOfLines={1}>{item.name}</Text>
-            {item.isPremium && <View style={styles.premiumBadge}><Text style={styles.premiumText}>⭐</Text></View>}
+            {item.isPremium && <View style={styles.premiumBadge}><Ionicons name="star" size={12} color="#d97706" /></View>}
           </View>
-          <Text style={styles.cardAddress} numberOfLines={1}>📍 {item.address}</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            <Ionicons name="location" size={12} color="#8b85a3" style={{ marginRight: 4 }} />
+            <Text style={styles.cardAddress} numberOfLines={1}>{item.address}</Text>
+          </View>
         </View>
         <View style={[styles.statusBadge, item.isVerified ? styles.statusVerified : styles.statusPending]}>
           <Text style={styles.statusText}>{item.isVerified ? '✓ Verified' : '⏳ Pending'}</Text>
@@ -269,7 +278,10 @@ export default function DashboardScreen({ navigation }) {
       {/* Quick Stats Row */}
       <View style={styles.cardStatsRow}>
         <View style={styles.cardStat}>
-          <Text style={styles.cardStatVal}>★ {item.rating > 0 ? item.rating.toFixed(1) : 'New'}</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            <Ionicons name="star" size={12} color="#f59e0b" style={{ marginRight: 2 }} />
+            <Text style={styles.cardStatVal}>{item.rating > 0 ? item.rating.toFixed(1) : 'New'}</Text>
+          </View>
           <Text style={styles.cardStatLabel}>Rating</Text>
         </View>
         <View style={styles.cardStatDivider} />
@@ -301,19 +313,28 @@ export default function DashboardScreen({ navigation }) {
           style={styles.actionBtnQuickUpdate}
           onPress={() => openQuickUpdate(item)}
         >
-          <Text style={styles.actionBtnQuickUpdateText}>🛏 Vacancies</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            <Ionicons name="bed" size={14} color="#ffffff" style={{ marginRight: 4 }} />
+            <Text style={styles.actionBtnQuickUpdateText}>Vacancies</Text>
+          </View>
         </TouchableOpacity>
         <TouchableOpacity
           style={styles.actionBtnAnalytics}
           onPress={() => fetchHostelAnalytics(item)}
         >
-          <Text style={styles.actionBtnAnalyticsText}>📊 Stats</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            <Ionicons name="stats-chart" size={14} color="#4F46E5" style={{ marginRight: 4 }} />
+            <Text style={styles.actionBtnAnalyticsText}>Stats</Text>
+          </View>
         </TouchableOpacity>
         <TouchableOpacity
           style={styles.actionBtnEdit}
           onPress={() => navigation.navigate('AddHostel', { editHostel: item })}
         >
-          <Text style={styles.actionBtnEditText}>✏️ Edit</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            <Ionicons name="create" size={14} color="#5f5a75" style={{ marginRight: 4 }} />
+            <Text style={styles.actionBtnEditText}>Edit</Text>
+          </View>
         </TouchableOpacity>
       </View>
       <View style={[styles.cardActionRow, { marginTop: 8 }]}>
@@ -321,13 +342,19 @@ export default function DashboardScreen({ navigation }) {
           style={[styles.actionBtnEdit, { flex: 1, backgroundColor: '#f0ecfd', borderColor: '#d8b4fe' }]}
           onPress={() => openUpiModal(item)}
         >
-          <Text style={[styles.actionBtnEditText, { color: '#7c3aed' }]}>💳 Set UPI</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            <Ionicons name="card" size={14} color="#4F46E5" style={{ marginRight: 4 }} />
+            <Text style={[styles.actionBtnEditText, { color: '#4F46E5' }]}>Set UPI</Text>
+          </View>
         </TouchableOpacity>
         <TouchableOpacity
           style={[styles.actionBtnEdit, { flex: 1, backgroundColor: '#dcfce7', borderColor: '#86efac' }]}
           onPress={() => openTenantsModal(item)}
         >
-          <Text style={[styles.actionBtnEditText, { color: '#16a34a' }]}>🧑‍🎓 Tenants</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            <Ionicons name="school" size={14} color="#16a34a" style={{ marginRight: 4 }} />
+            <Text style={[styles.actionBtnEditText, { color: '#16a34a' }]}>Tenants</Text>
+          </View>
         </TouchableOpacity>
       </View>
     </View>
@@ -339,7 +366,7 @@ export default function DashboardScreen({ navigation }) {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor="#7c3aed" />
+          <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor="#4F46E5" />
         }
       >
 
@@ -348,7 +375,7 @@ export default function DashboardScreen({ navigation }) {
           <View style={styles.header}>
             <View>
               <Text style={styles.welcomeText}>Welcome back,</Text>
-              <Text style={styles.ownerName}>{user?.name} Garu 🙏</Text>
+              <Text style={styles.ownerName}>{user?.name} Garu</Text>
             </View>
             <View style={styles.proBadge}>
               <Text style={styles.proBadgeText}>PRO DASHBOARD</Text>
@@ -359,24 +386,24 @@ export default function DashboardScreen({ navigation }) {
         {/* Summary Stats Grid (Overlapping) */}
         <View style={styles.statsGrid}>
           <View style={[styles.statCard, styles.statCardGlass]}>
-            <View style={styles.statIconWrapperPurple}><Text style={styles.statCardIcon}>🏠</Text></View>
+            <View style={styles.statIconWrapperPurple}><Ionicons name="home" size={20} color="#4F46E5" /></View>
             <Text style={styles.statCardVal}>{hostels.length}</Text>
             <Text style={styles.statCardLabel}>Active Listings</Text>
           </View>
           <View style={[styles.statCard, styles.statCardGlass]}>
-            <View style={styles.statIconWrapperGreen}><Text style={styles.statCardIcon}>📩</Text></View>
+            <View style={styles.statIconWrapperGreen}><Ionicons name="mail" size={20} color="#10b981" /></View>
             <Text style={styles.statCardVal}>{leadsCount}</Text>
             <Text style={styles.statCardLabel}>Total Leads</Text>
           </View>
           <View style={[styles.statCard, styles.statCardGlass]}>
-            <View style={styles.statIconWrapperAmber}><Text style={styles.statCardIcon}>👁️</Text></View>
+            <View style={styles.statIconWrapperAmber}><Ionicons name="eye" size={20} color="#f59e0b" /></View>
             <Text style={styles.statCardVal}>
               {hostels.reduce((s, h) => s + (h.viewCount || 0), 0)}
             </Text>
             <Text style={styles.statCardLabel}>Total Views</Text>
           </View>
           <View style={[styles.statCard, styles.statCardGlass]}>
-            <View style={styles.statIconWrapperBlue}><Text style={styles.statCardIcon}>⭐</Text></View>
+            <View style={styles.statIconWrapperBlue}><Ionicons name="star" size={20} color="#3b82f6" /></View>
             <Text style={styles.statCardVal}>
               {hostels.length > 0
                 ? (hostels.reduce((s, h) => s + (h.rating || 0), 0) / hostels.length).toFixed(1)
@@ -390,7 +417,10 @@ export default function DashboardScreen({ navigation }) {
         {/* Revenue Forecast Card */}
         <View style={styles.revenueCard}>
           <View style={styles.revenueHeader}>
-            <Text style={styles.revenueTitle}>💰 Revenue Potential</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <Ionicons name="cash" size={16} color="#1e1b29" style={{ marginRight: 6 }} />
+              <Text style={styles.revenueTitle}>Revenue Potential</Text>
+            </View>
             <Text style={styles.revenueSubtitle}>Estimated full-occupancy income</Text>
           </View>
           <Text style={styles.revenueVal}>
@@ -416,7 +446,7 @@ export default function DashboardScreen({ navigation }) {
         {/* My Listings */}
         <Text style={styles.sectionTitle}>My Hostel Profiles</Text>
         {loading ? (
-          <ActivityIndicator size="small" color="#7c3aed" style={{ marginTop: 20 }} />
+          <ActivityIndicator size="small" color="#4F46E5" style={{ marginTop: 20 }} />
         ) : (
           <FlatList
             data={hostels}
@@ -425,7 +455,7 @@ export default function DashboardScreen({ navigation }) {
             scrollEnabled={false}
             ListEmptyComponent={
               <View style={styles.emptyBox}>
-                <Text style={styles.emptyIcon}>🏚️</Text>
+                <Ionicons name="home-outline" size={48} color="#8b85a3" style={{ marginBottom: 12 }} />
                 <Text style={styles.emptyTitle}>No listings yet</Text>
                 <Text style={styles.emptySub}>Add your first PG to start getting leads!</Text>
                 <TouchableOpacity
@@ -454,26 +484,35 @@ export default function DashboardScreen({ navigation }) {
             <View style={styles.analyticsHandle} />
             {selectedHostelAnalytics && (
               <ScrollView showsVerticalScrollIndicator={false}>
-                <Text style={styles.analyticsTitle}>
-                  📊 {selectedHostelAnalytics.hostel.name}
-                </Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 16 }}>
+                  <Ionicons name="stats-chart" size={18} color="#1e1b29" style={{ marginRight: 6 }} />
+                  <Text style={[styles.analyticsTitle, { marginBottom: 0 }]}>
+                    {selectedHostelAnalytics.hostel.name}
+                  </Text>
+                </View>
 
                 {/* View Metrics */}
                 <View style={styles.analyticsSection}>
-                  <Text style={styles.analyticsSectionTitle}>👁️ Views This Week</Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
+                    <Ionicons name="eye" size={13} color="#1e1b29" style={{ marginRight: 6 }} />
+                    <Text style={[styles.analyticsSectionTitle, { marginBottom: 0 }]}>Views This Week</Text>
+                  </View>
                   <Text style={styles.analyticsBigNum}>
                     {selectedHostelAnalytics.analytics.totalViews}
                     <Text style={styles.analyticsBigNumSub}> total views</Text>
                   </Text>
                   <SparkLine
                     data={selectedHostelAnalytics.analytics.weeklyViews || [0, 0, 0, 0, 0, 0, 0]}
-                    color="#7c3aed"
+                    color="#4F46E5"
                   />
                 </View>
 
                 {/* Enquiry Funnel */}
                 <View style={styles.analyticsSection}>
-                  <Text style={styles.analyticsSectionTitle}>📋 Enquiry Funnel</Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
+                    <Ionicons name="clipboard" size={13} color="#1e1b29" style={{ marginRight: 6 }} />
+                    <Text style={[styles.analyticsSectionTitle, { marginBottom: 0 }]}>Enquiry Funnel</Text>
+                  </View>
                   <Text style={styles.funnelTotal}>
                     {selectedHostelAnalytics.analytics.totalEnquiries} total enquiries
                   </Text>
@@ -482,10 +521,10 @@ export default function DashboardScreen({ navigation }) {
                     const total = f.pending + f.contacted + f.visited + f.closed;
                     return (
                       <View>
-                        <FunnelStep label="📩 Pending" count={f.pending} total={total} color="#f59e0b" />
-                        <FunnelStep label="📞 Contacted" count={f.contacted} total={total} color="#3b82f6" />
-                        <FunnelStep label="🏠 Visited" count={f.visited} total={total} color="#8b5cf6" />
-                        <FunnelStep label="✅ Closed" count={f.closed} total={total} color="#10b981" />
+                        <FunnelStep icon="mail" label="Pending" count={f.pending} total={total} color="#f59e0b" />
+                        <FunnelStep icon="call" label="Contacted" count={f.contacted} total={total} color="#3b82f6" />
+                        <FunnelStep icon="home" label="Visited" count={f.visited} total={total} color="#8b5cf6" />
+                        <FunnelStep icon="checkmark-circle" label="Closed" count={f.closed} total={total} color="#10b981" />
                       </View>
                     );
                   })()}
@@ -493,7 +532,10 @@ export default function DashboardScreen({ navigation }) {
 
                 {/* Availability */}
                 <View style={styles.analyticsSection}>
-                  <Text style={styles.analyticsSectionTitle}>🛏️ Room Availability</Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
+                    <Ionicons name="bed" size={13} color="#1e1b29" style={{ marginRight: 6 }} />
+                    <Text style={[styles.analyticsSectionTitle, { marginBottom: 0 }]}>Room Availability</Text>
+                  </View>
                   <View style={styles.availabilityGrid}>
                     {[
                       { label: 'Single', key: 'singleVacancy' },
@@ -516,12 +558,18 @@ export default function DashboardScreen({ navigation }) {
 
                 {/* Potential Revenue */}
                 <View style={styles.analyticsSection}>
-                  <Text style={styles.analyticsSectionTitle}>💰 Revenue Potential</Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
+                    <Ionicons name="cash" size={13} color="#1e1b29" style={{ marginRight: 6 }} />
+                    <Text style={[styles.analyticsSectionTitle, { marginBottom: 0 }]}>Revenue Potential</Text>
+                  </View>
                   {Object.entries(selectedHostelAnalytics.analytics.potentialRevenue || {}).map(([key, val]) => (
                     <View key={key} style={styles.revRow}>
-                      <Text style={styles.revRowLabel}>
-                        {key === 'single' ? '🛏 Single' : key === 'sharing2' ? '🛏🛏 2-Share' : '🛏🛏🛏 3-Share'}
-                      </Text>
+                      <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                        <Ionicons name="bed" size={12} color="#5f5a75" style={{ marginRight: 4 }} />
+                        <Text style={styles.revRowLabel}>
+                          {key === 'single' ? 'Single' : key === 'sharing2' ? '2-Share' : '3-Share'}
+                        </Text>
+                      </View>
                       <Text style={styles.revRowVal}>₹{val.toLocaleString('en-IN')}/mo</Text>
                     </View>
                   ))}
@@ -640,12 +688,12 @@ export default function DashboardScreen({ navigation }) {
           <View style={[styles.analyticsSheet, { height: '80%' }]}>
             <View style={styles.analyticsHandle} />
             <Text style={styles.analyticsTitle}>Manage Students ({tenants.length})</Text>
-            
+
             {loadingTenants ? (
-              <ActivityIndicator color="#7c3aed" size="large" style={{ marginTop: 40 }} />
+              <ActivityIndicator color="#4F46E5" size="large" style={{ marginTop: 40 }} />
             ) : tenants.length === 0 ? (
               <View style={styles.emptyBox}>
-                <Text style={styles.emptyIcon}>📭</Text>
+                <Ionicons name="mail-open-outline" size={48} color="#8b85a3" style={{ marginBottom: 12 }} />
                 <Text style={styles.emptyTitle}>No Students Yet</Text>
                 <Text style={styles.emptySub}>When students pay and join via the app, they will appear here.</Text>
               </View>
@@ -655,26 +703,39 @@ export default function DashboardScreen({ navigation }) {
                 keyExtractor={item => item._id}
                 contentContainerStyle={{ gap: 10, paddingBottom: 20 }}
                 renderItem={({ item }) => (
-                  <View style={{ backgroundColor: '#f8f6fc', borderRadius: 12, padding: 14, borderWidth: 1, borderColor: '#e5e0f8' }}>
+                  <View style={{ backgroundColor: '#ffffff', borderRadius: 12, padding: 14, borderWidth: 1, borderColor: '#e5e0f8' }}>
                     <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 }}>
                       <Text style={{ fontSize: 15, fontWeight: 'bold', color: '#1e1b29' }}>{item.studentName}</Text>
-                      <Text style={{ fontSize: 13, fontWeight: 'bold', color: '#7c3aed' }}>₹{item.rentPaid}</Text>
+                      <Text style={{ fontSize: 13, fontWeight: 'bold', color: '#4F46E5' }}>Rent: ₹{item.rentAmount}</Text>
                     </View>
-                    <Text style={{ fontSize: 13, color: '#5f5a75', marginBottom: 2 }}>📞 {item.studentPhone}</Text>
-                    <Text style={{ fontSize: 12, color: '#8b85a3', marginBottom: 12 }}>🛏️ {item.roomType} • Joined {new Date(item.joinDate).toLocaleDateString()}</Text>
-                    
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                        <Ionicons name="call" size={13} color="#5f5a75" style={{ marginRight: 4 }} />
+                        <Text style={{ fontSize: 13, color: '#5f5a75' }}>{item.studentPhone}</Text>
+                      </View>
+                      <Text style={{ fontSize: 13, fontWeight: 'bold', color: item.pendingAmount > 0 ? '#ef4444' : '#10b981' }}>
+                        {item.pendingAmount > 0 ? `Due: ₹${item.pendingAmount}` : 'No Dues'}
+                      </Text>
+                    </View>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
+                      <Ionicons name="bed" size={12} color="#8b85a3" style={{ marginRight: 4 }} />
+                      <Text style={{ fontSize: 12, color: '#8b85a3' }}>{item.roomType} • Joined {new Date(item.joinDate).toLocaleDateString()}</Text>
+                    </View>
+
                     <View style={{ flexDirection: 'row', gap: 8 }}>
                       <TouchableOpacity
-                        style={{ flex: 1, backgroundColor: '#dcfce7', paddingVertical: 8, borderRadius: 8, alignItems: 'center' }}
+                        style={{ flex: 1, backgroundColor: '#dcfce7', paddingVertical: 8, borderRadius: 8, alignItems: 'center', flexDirection: 'row', justifyContent: 'center' }}
                         onPress={() => handleWhatsAppReminder(item)}
                       >
-                        <Text style={{ color: '#16a34a', fontWeight: 'bold', fontSize: 12 }}>🔔 Remind</Text>
+                        <Ionicons name="notifications" size={12} color="#16a34a" style={{ marginRight: 4 }} />
+                        <Text style={{ color: '#16a34a', fontWeight: 'bold', fontSize: 12 }}>Remind</Text>
                       </TouchableOpacity>
                       <TouchableOpacity
-                        style={{ flex: 1, backgroundColor: '#ede9fe', paddingVertical: 8, borderRadius: 8, alignItems: 'center' }}
+                        style={{ flex: 1, backgroundColor: '#EEF2FF', paddingVertical: 8, borderRadius: 8, alignItems: 'center', flexDirection: 'row', justifyContent: 'center' }}
                         onPress={() => handleShowReceipt(item)}
                       >
-                        <Text style={{ color: '#7c3aed', fontWeight: 'bold', fontSize: 12 }}>📄 Receipt</Text>
+                        <Ionicons name="document-text" size={12} color="#4F46E5" style={{ marginRight: 4 }} />
+                        <Text style={{ color: '#4F46E5', fontWeight: 'bold', fontSize: 12 }}>Receipt</Text>
                       </TouchableOpacity>
                       <TouchableOpacity
                         style={{ flex: 1, backgroundColor: '#fee2e2', paddingVertical: 8, borderRadius: 8, alignItems: 'center' }}
@@ -687,7 +748,7 @@ export default function DashboardScreen({ navigation }) {
                 )}
               />
             )}
-            
+
             <TouchableOpacity style={styles.analyticsCloseBtn} onPress={() => setTenantsModalVisible(false)}>
               <Text style={styles.analyticsCloseBtnText}>Close</Text>
             </TouchableOpacity>
@@ -699,12 +760,12 @@ export default function DashboardScreen({ navigation }) {
       <Modal visible={receiptModalVisible} transparent animationType="fade" onRequestClose={() => setReceiptModalVisible(false)}>
         <View style={styles.quickModalOverlay}>
           <View style={[styles.quickModalBox, { padding: 0, overflow: 'hidden' }]}>
-            <View style={{ backgroundColor: '#7c3aed', padding: 20, alignItems: 'center' }}>
-              <Text style={{ fontSize: 40 }}>🧾</Text>
+            <View style={{ backgroundColor: '#4F46E5', padding: 20, alignItems: 'center' }}>
+              <Ionicons name="receipt" size={40} color="#fff" />
               <Text style={{ color: '#fff', fontSize: 18, fontWeight: 'bold', marginTop: 10 }}>Rent Receipt</Text>
               <Text style={{ color: '#ddd6fe', fontSize: 12, marginTop: 4 }}>HostelSathi Verified Payment</Text>
             </View>
-            
+
             {selectedReceipt && (
               <View style={{ padding: 20 }}>
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 12, borderBottomWidth: 1, borderBottomColor: '#f1f1f1', paddingBottom: 12 }}>
@@ -747,7 +808,7 @@ export default function DashboardScreen({ navigation }) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f8f6fc' },
+  container: { flex: 1, backgroundColor: '#F9FAFB' },
   scrollContent: { padding: 16 },
   proHeaderBg: {
     backgroundColor: '#4c1d95',
@@ -785,12 +846,12 @@ const styles = StyleSheet.create({
     shadowRadius: 15,
     elevation: 5
   },
-  statIconWrapperPurple: { backgroundColor: '#ede9fe', padding: 8, borderRadius: 12, marginBottom: 8 },
+  statIconWrapperPurple: { backgroundColor: '#EEF2FF', padding: 8, borderRadius: 12, marginBottom: 8 },
   statIconWrapperGreen: { backgroundColor: '#d1fae5', padding: 8, borderRadius: 12, marginBottom: 8 },
   statIconWrapperAmber: { backgroundColor: '#fef3c7', padding: 8, borderRadius: 12, marginBottom: 8 },
   statIconWrapperBlue: { backgroundColor: '#dbeafe', padding: 8, borderRadius: 12, marginBottom: 8 },
   statCardIcon: { fontSize: 20 },
-  statCardPurple: { backgroundColor: '#ede9fe', borderWidth: 1, borderColor: 'rgba(124,58,237,0.15)' },
+  statCardPurple: { backgroundColor: '#EEF2FF', borderWidth: 1, borderColor: 'rgba(124,58,237,0.15)' },
   statCardGreen: { backgroundColor: '#d1fae5', borderWidth: 1, borderColor: 'rgba(16,185,129,0.15)' },
   statCardAmber: { backgroundColor: '#fef3c7', borderWidth: 1, borderColor: 'rgba(245,158,11,0.15)' },
   statCardBlue: { backgroundColor: '#dbeafe', borderWidth: 1, borderColor: 'rgba(59,130,246,0.15)' },
@@ -804,7 +865,7 @@ const styles = StyleSheet.create({
     marginBottom: 20,
     borderWidth: 1,
     borderColor: 'rgba(124,58,237,0.15)',
-    shadowColor: '#7c3aed',
+    shadowColor: '#4F46E5',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.06,
     shadowRadius: 12,
@@ -813,12 +874,12 @@ const styles = StyleSheet.create({
   revenueHeader: { marginBottom: 8 },
   revenueTitle: { fontSize: 14, fontWeight: 'bold', color: '#1e1b29' },
   revenueSubtitle: { fontSize: 11, color: '#a09abc', marginTop: 2 },
-  revenueVal: { fontSize: 28, fontWeight: 'bold', color: '#7c3aed', marginBottom: 12 },
+  revenueVal: { fontSize: 28, fontWeight: 'bold', color: '#4F46E5', marginBottom: 12 },
   revenueUnit: { fontSize: 14, fontWeight: 'normal', color: '#8b85a3' },
   revenueBreakdown: { borderTopWidth: 1, borderTopColor: 'rgba(124,58,237,0.08)', paddingTop: 10 },
   revenueRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 },
   revenueRowName: { fontSize: 12, color: '#5f5a75', flex: 1 },
-  revenueRowVal: { fontSize: 12, fontWeight: 'bold', color: '#7c3aed' },
+  revenueRowVal: { fontSize: 12, fontWeight: 'bold', color: '#4F46E5' },
   sectionTitle: { fontSize: 17, fontWeight: 'bold', color: '#1e1b29', marginBottom: 12 },
   card: {
     backgroundColor: '#ffffff',
@@ -827,7 +888,7 @@ const styles = StyleSheet.create({
     marginBottom: 14,
     borderWidth: 1,
     borderColor: 'rgba(124,58,237,0.1)',
-    shadowColor: '#7c3aed',
+    shadowColor: '#4F46E5',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.06,
     shadowRadius: 12,
@@ -845,20 +906,20 @@ const styles = StyleSheet.create({
   statusText: { fontSize: 10, fontWeight: 'bold', color: '#059669' },
   cardStatsRow: {
     flexDirection: 'row',
-    backgroundColor: '#f8f6fc',
+    backgroundColor: '#ffffff',
     borderRadius: 10,
     padding: 10,
     marginBottom: 12,
     alignItems: 'center'
   },
   cardStat: { flex: 1, alignItems: 'center' },
-  cardStatVal: { fontSize: 13, fontWeight: 'bold', color: '#7c3aed' },
+  cardStatVal: { fontSize: 13, fontWeight: 'bold', color: '#4F46E5' },
   cardStatLabel: { fontSize: 10, color: '#a09abc', marginTop: 2 },
   cardStatDivider: { width: 1, height: 24, backgroundColor: 'rgba(124,58,237,0.12)' },
   cardActionRow: { flexDirection: 'row', gap: 6 },
   actionBtnQuickUpdate: {
     flex: 1.2,
-    backgroundColor: '#7c3aed',
+    backgroundColor: '#4F46E5',
     paddingVertical: 9,
     borderRadius: 10,
     alignItems: 'center'
@@ -866,17 +927,17 @@ const styles = StyleSheet.create({
   actionBtnQuickUpdateText: { color: '#ffffff', fontWeight: 'bold', fontSize: 12 },
   actionBtnAnalytics: {
     flex: 1,
-    backgroundColor: '#ede9fe',
+    backgroundColor: '#EEF2FF',
     paddingVertical: 9,
     borderRadius: 10,
     alignItems: 'center',
     borderWidth: 1,
     borderColor: '#c4b5fd'
   },
-  actionBtnAnalyticsText: { color: '#7c3aed', fontWeight: 'bold', fontSize: 12 },
+  actionBtnAnalyticsText: { color: '#4F46E5', fontWeight: 'bold', fontSize: 12 },
   actionBtnEdit: {
     flex: 1,
-    backgroundColor: '#f8f6fc',
+    backgroundColor: '#ffffff',
     paddingVertical: 9,
     borderRadius: 10,
     alignItems: 'center',
@@ -888,7 +949,7 @@ const styles = StyleSheet.create({
   emptyIcon: { fontSize: 48, marginBottom: 12 },
   emptyTitle: { fontSize: 18, fontWeight: 'bold', color: '#1e1b29', marginBottom: 8 },
   emptySub: { fontSize: 14, color: '#8b85a3', textAlign: 'center', marginBottom: 20 },
-  addBtn: { backgroundColor: '#7c3aed', paddingVertical: 12, paddingHorizontal: 24, borderRadius: 50 },
+  addBtn: { backgroundColor: '#4F46E5', paddingVertical: 12, paddingHorizontal: 24, borderRadius: 50 },
   addBtnText: { color: '#ffffff', fontWeight: 'bold', fontSize: 14 },
   // Analytics Modal
   analyticsOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
@@ -910,14 +971,14 @@ const styles = StyleSheet.create({
   analyticsTitle: { fontSize: 18, fontWeight: 'bold', color: '#1e1b29', marginBottom: 16 },
   analyticsSection: {
     marginBottom: 20,
-    backgroundColor: '#f8f6fc',
+    backgroundColor: '#ffffff',
     borderRadius: 14,
     padding: 14,
     borderWidth: 1,
     borderColor: 'rgba(124,58,237,0.08)'
   },
   analyticsSectionTitle: { fontSize: 13, fontWeight: 'bold', color: '#1e1b29', marginBottom: 8 },
-  analyticsBigNum: { fontSize: 32, fontWeight: 'bold', color: '#7c3aed', marginBottom: 10 },
+  analyticsBigNum: { fontSize: 32, fontWeight: 'bold', color: '#4F46E5', marginBottom: 10 },
   analyticsBigNumSub: { fontSize: 14, fontWeight: 'normal', color: '#8b85a3' },
   sparkline: { flexDirection: 'row', alignItems: 'flex-end', gap: 4, height: 56 },
   sparklineBarWrap: { flex: 1, alignItems: 'center', justifyContent: 'flex-end' },
@@ -949,9 +1010,9 @@ const styles = StyleSheet.create({
   full: { color: '#ef4444' },
   revRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 },
   revRowLabel: { fontSize: 13, color: '#5f5a75' },
-  revRowVal: { fontSize: 13, fontWeight: 'bold', color: '#7c3aed' },
+  revRowVal: { fontSize: 13, fontWeight: 'bold', color: '#4F46E5' },
   analyticsCloseBtn: {
-    backgroundColor: '#7c3aed',
+    backgroundColor: '#4F46E5',
     borderRadius: 14,
     paddingVertical: 14,
     alignItems: 'center',
@@ -965,11 +1026,11 @@ const styles = StyleSheet.create({
   quickModalSub: { fontSize: 13, color: '#8b85a3', marginBottom: 20 },
   quickInputRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
   quickInputLabel: { fontSize: 14, color: '#5f5a75', fontWeight: '600' },
-  quickInput: { width: 80, height: 40, borderWidth: 1, borderColor: '#e5e0f8', borderRadius: 8, textAlign: 'center', backgroundColor: '#f8f6fc', color: '#1e1b29', fontWeight: 'bold' },
+  quickInput: { width: 80, height: 40, borderWidth: 1, borderColor: '#e5e0f8', borderRadius: 8, textAlign: 'center', backgroundColor: '#ffffff', color: '#1e1b29', fontWeight: 'bold' },
   quickActionRow: { flexDirection: 'row', justifyContent: 'flex-end', gap: 12, marginTop: 20 },
   quickCancelBtn: { paddingVertical: 10, paddingHorizontal: 16, borderRadius: 8, backgroundColor: '#f1f1f1' },
   quickCancelText: { color: '#5f5a75', fontWeight: 'bold' },
-  quickSaveBtn: { paddingVertical: 10, paddingHorizontal: 20, borderRadius: 8, backgroundColor: '#7c3aed', minWidth: 120, alignItems: 'center' },
+  quickSaveBtn: { paddingVertical: 10, paddingHorizontal: 20, borderRadius: 8, backgroundColor: '#4F46E5', minWidth: 120, alignItems: 'center' },
   quickSaveText: { color: '#ffffff', fontWeight: 'bold' },
   fab: {
     position: 'absolute',

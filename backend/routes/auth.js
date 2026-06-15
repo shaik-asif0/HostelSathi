@@ -46,9 +46,10 @@ router.post(
         });
       }
 
-      // Hash password
+      // Hash password (make sure we trim it to avoid invisible spaces)
+      const cleanPassword = password.trim();
       const salt = await bcrypt.genSalt(10);
-      const hashedPassword = await bcrypt.hash(password, salt);
+      const hashedPassword = await bcrypt.hash(cleanPassword, salt);
 
       // Create user
       user = await User.create({
@@ -97,19 +98,23 @@ router.post(
     const { username, password } = req.body;
 
     try {
+      // Clean up inputs to prevent invisible spaces causing credential mismatch
+      const cleanUsername = username.trim().toLowerCase();
+      const cleanPassword = password.trim();
+
       // Check user by email or phone
       const user = await User.findOne({
-        $or: [{ email: username.toLowerCase() }, { phone: username }]
+        $or: [{ email: cleanUsername }, { phone: username.trim() }]
       });
 
       if (!user) {
-        return res.status(400).json({ success: false, error: 'Invalid Credentials' });
+        return res.status(400).json({ success: false, error: 'User not found. Please check your email/phone number.' });
       }
 
       // Match password
-      const isMatch = await bcrypt.compare(password, user.password);
+      const isMatch = await bcrypt.compare(cleanPassword, user.password);
       if (!isMatch) {
-        return res.status(400).json({ success: false, error: 'Invalid Credentials' });
+        return res.status(400).json({ success: false, error: 'Incorrect password. Please try again.' });
       }
 
       res.json({
@@ -121,7 +126,8 @@ router.post(
           phone: user.phone,
           email: user.email,
           role: user.role,
-          college: user.college
+          college: user.college,
+          unlockedHostels: user.unlockedHostels || []
         }
       });
     } catch (error) {
@@ -182,7 +188,8 @@ router.post('/verify-otp', async (req, res) => {
           phone: user.phone,
           email: user.email,
           role: user.role,
-          college: user.college
+          college: user.college,
+          unlockedHostels: user.unlockedHostels || []
         }
       });
     } else {
@@ -205,6 +212,57 @@ router.get('/me', protect, async (req, res) => {
     success: true,
     user: req.user
   });
+});
+
+// @route   PUT /api/auth/preferences
+// @desc    Update student preferences for AI recommendations
+// @access  Private
+router.put('/preferences', protect, async (req, res) => {
+  try {
+    const { budget, gender, foodRequired, preferredAmenities, college } = req.body;
+    const updateData = {};
+
+    if (budget !== undefined) updateData['preferences.budget'] = parseInt(budget);
+    if (gender !== undefined) updateData['preferences.gender'] = gender;
+    if (foodRequired !== undefined) updateData['preferences.foodRequired'] = foodRequired;
+    if (preferredAmenities !== undefined) updateData['preferences.preferredAmenities'] = preferredAmenities;
+    if (college !== undefined) updateData.college = college;
+
+    const user = await User.findByIdAndUpdate(
+      req.user._id,
+      { $set: updateData },
+      { new: true }
+    );
+
+    res.json({ success: true, message: 'Preferences updated', user });
+  } catch (error) {
+    console.error('Update preferences error:', error);
+    res.status(500).json({ success: false, error: 'Server error updating preferences' });
+  }
+});
+
+// @route   PUT /api/auth/profile
+// @desc    Update student/owner profile (name, phone)
+// @access  Private
+router.put('/profile', protect, async (req, res) => {
+  try {
+    const { name, phone, college } = req.body;
+    const updateData = {};
+    if (name) updateData.name = name;
+    if (phone) updateData.phone = phone;
+    if (college !== undefined) updateData.college = college;
+
+    const user = await User.findByIdAndUpdate(
+      req.user._id,
+      { $set: updateData },
+      { new: true, select: '-password' }
+    );
+
+    res.json({ success: true, message: 'Profile updated', user });
+  } catch (error) {
+    console.error('Update profile error:', error);
+    res.status(500).json({ success: false, error: 'Server error updating profile' });
+  }
 });
 
 module.exports = router;

@@ -6,13 +6,14 @@ import {
 import { useDispatch, useSelector } from 'react-redux';
 import { fetchHostelsStart, fetchHostelsSuccess, fetchHostelsFailure } from '../../redux/hostelSlice';
 import apiClient from '../../api/apiClient';
+import Ionicons from 'react-native-vector-icons/Ionicons';
 
 const QUICK_FILTERS = [
-  { label: '🏠 All', value: null },
-  { label: '👦 Boys', value: 'boys' },
-  { label: '👧 Girls', value: 'girls' },
-  { label: '🍽️ Food Incl.', value: 'food' },
-  { label: '⭐ Premium', value: 'premium' }
+  { label: 'All', icon: 'home', value: null },
+  { label: 'Boys', icon: 'male', value: 'boys' },
+  { label: 'Girls', icon: 'female', value: 'girls' },
+  { label: 'Food Incl.', icon: 'restaurant', value: 'food' },
+  { label: 'Premium', icon: 'star', value: 'premium' }
 ];
 
 export default function HomeScreen({ navigation }) {
@@ -82,9 +83,9 @@ export default function HomeScreen({ navigation }) {
     >
       {/* Card image area */}
       <View style={styles.cardImagePlaceholder}>
-        <Image 
-          source={{ uri: (item.photos && item.photos.length > 0) ? item.photos[0] : 'https://images.unsplash.com/photo-1555854877-bab0e564b8d5?auto=format&fit=crop&w=500&q=80' }} 
-          style={styles.cardCoverImage} 
+        <Image
+          source={{ uri: (item.photos && item.photos.length > 0) ? item.photos[0] : 'https://images.unsplash.com/photo-1555854877-bab0e564b8d5?auto=format&fit=crop&w=500&q=80' }}
+          style={styles.cardCoverImage}
         />
         {item.isPremium && <View style={styles.premiumBadge}><Text style={styles.premiumText}>PREMIUM</Text></View>}
         {item.isVerified && <View style={styles.verifiedBadge}><Text style={styles.verifiedText}>✓ Verified</Text></View>}
@@ -98,9 +99,12 @@ export default function HomeScreen({ navigation }) {
         </View>
         <Text style={styles.cardAddr} numberOfLines={1}>📍 {item.address}</Text>
         {item.nearbyColleges?.length > 0 && (
-          <Text style={styles.cardColleges} numberOfLines={1}>
-            🎓 Near {item.nearbyColleges.slice(0, 2).join(', ')}
-          </Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
+            <Ionicons name="school" size={11} color="#4F46E5" style={{ marginRight: 4 }} />
+            <Text style={styles.cardColleges} numberOfLines={1}>
+              Near {item.nearbyColleges.slice(0, 2).join(', ')}
+            </Text>
+          </View>
         )}
         <View style={styles.cardFooterRow}>
           <View>
@@ -108,9 +112,12 @@ export default function HomeScreen({ navigation }) {
             <Text style={styles.cardRent}>₹{getMinRent(item).toLocaleString('en-IN')}/mo</Text>
           </View>
           <View style={styles.genderChip}>
-            <Text style={styles.genderText}>
-              {item.gender === 'boys' ? '👦 Boys' : item.gender === 'girls' ? '👧 Girls' : '👫 Co-living'}
-            </Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+              {item.gender === 'boys' ? <Ionicons name="male" size={10} color="#5f5a75" style={{ marginRight: 4 }} /> : item.gender === 'girls' ? <Ionicons name="female" size={10} color="#5f5a75" style={{ marginRight: 4 }} /> : <Ionicons name="people" size={10} color="#5f5a75" style={{ marginRight: 4 }} />}
+              <Text style={styles.genderText}>
+                {item.gender === 'boys' ? 'Boys' : item.gender === 'girls' ? 'Girls' : 'Co-living'}
+              </Text>
+            </View>
           </View>
         </View>
       </View>
@@ -125,9 +132,9 @@ export default function HomeScreen({ navigation }) {
     >
       <View style={styles.compactLeft}>
         <View style={styles.compactIcon}>
-          <Image 
-            source={{ uri: (item.photos && item.photos.length > 0) ? item.photos[0] : 'https://images.unsplash.com/photo-1555854877-bab0e564b8d5?auto=format&fit=crop&w=200&q=80' }} 
-            style={{ width: '100%', height: '100%', borderRadius: 12, resizeMode: 'cover' }} 
+          <Image
+            source={{ uri: (item.photos && item.photos.length > 0) ? item.photos[0] : 'https://images.unsplash.com/photo-1555854877-bab0e564b8d5?auto=format&fit=crop&w=200&q=80' }}
+            style={{ width: '100%', height: '100%', borderRadius: 12, resizeMode: 'cover' }}
           />
         </View>
       </View>
@@ -147,12 +154,12 @@ export default function HomeScreen({ navigation }) {
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="#7c3aed" />
+      <StatusBar barStyle="light-content" backgroundColor="#4F46E5" />
 
       <ScrollView
         showsVerticalScrollIndicator={false}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor="#7c3aed" />
+          <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor="#4F46E5" />
         }
       >
         {/* Hero Banner */}
@@ -168,7 +175,7 @@ export default function HomeScreen({ navigation }) {
               style={styles.notifBtn}
               onPress={() => navigation.navigate('Notifications')}
             >
-              <Text style={styles.notifIcon}>🔔</Text>
+              <Ionicons name="notifications" size={20} color="#fff" />
               {unreadCount > 0 && (
                 <View style={styles.notifBadge}>
                   <Text style={styles.notifBadgeText}>
@@ -179,15 +186,38 @@ export default function HomeScreen({ navigation }) {
             </TouchableOpacity>
           </View>
 
-          {/* Search bar */}
           <TouchableOpacity
             style={styles.searchBarBtn}
             onPress={() => navigation.navigate('Search')}
             activeOpacity={0.9}
           >
-            <Text style={styles.searchIcon}>🔍</Text>
+            <Ionicons name="search" size={16} color="#a09abc" />
             <Text style={styles.searchPlaceholder}>Search hostels, college, area...</Text>
           </TouchableOpacity>
+
+          {/* Quick Actions */}
+          <View style={styles.quickActions}>
+            <TouchableOpacity style={styles.qaBtn} onPress={() => navigation.navigate('ScanAndPay')}>
+              <View style={[styles.qaIconWrap, { backgroundColor: 'rgba(255,255,255,0.2)' }]}>
+                <Ionicons name="camera" size={22} color="#fff" />
+              </View>
+              <Text style={styles.qaText}>Scan & Pay</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity style={styles.qaBtn} onPress={() => navigation.navigate('Map')}>
+              <View style={[styles.qaIconWrap, { backgroundColor: 'rgba(255,255,255,0.2)' }]}>
+                <Ionicons name="location" size={22} color="#fff" />
+              </View>
+              <Text style={styles.qaText}>Near Me</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity style={styles.qaBtn} onPress={() => navigation.navigate('MyReceipts')}>
+              <View style={[styles.qaIconWrap, { backgroundColor: 'rgba(255,255,255,0.2)' }]}>
+                <Ionicons name="receipt" size={22} color="#fff" />
+              </View>
+              <Text style={styles.qaText}>Receipts</Text>
+            </TouchableOpacity>
+          </View>
         </View>
 
         {/* Stats Banner */}
@@ -211,15 +241,18 @@ export default function HomeScreen({ navigation }) {
         {/* Recommended For You */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>🤖 Recommended For You</Text>
-            <TouchableOpacity onPress={() => navigation.navigate('Search')}>
-              <Text style={styles.seeAll}>See All →</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <Ionicons name="hardware-chip" size={18} color="#1e1b29" style={{ marginRight: 6 }} />
+              <Text style={styles.sectionTitle}>Recommended For You</Text>
+            </View>
+            <TouchableOpacity onPress={() => navigation.navigate('HostelList')}>
+              <Text style={styles.seeAll}>See All <Ionicons name="arrow-forward" size={12} /></Text>
             </TouchableOpacity>
           </View>
 
           {recLoading ? (
             <View style={styles.recLoadingBox}>
-              <ActivityIndicator color="#7c3aed" />
+              <ActivityIndicator color="#4F46E5" />
               <Text style={styles.recLoadingText}>Personalizing picks...</Text>
             </View>
           ) : (
@@ -232,7 +265,8 @@ export default function HomeScreen({ navigation }) {
               contentContainerStyle={styles.horizontalList}
               ListEmptyComponent={
                 <View style={styles.emptyHorizontal}>
-                  <Text style={styles.emptyText}>🏚️ No hostels yet. Run the seeder!</Text>
+                  <Ionicons name="home-outline" size={32} color="#8b85a3" style={{ marginBottom: 8 }} />
+                  <Text style={styles.emptyText}>No hostels yet. Run the seeder!</Text>
                 </View>
               }
             />
@@ -242,14 +276,17 @@ export default function HomeScreen({ navigation }) {
         {/* All Hostels */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>🏠 All Hostels</Text>
-            <TouchableOpacity onPress={() => navigation.navigate('Search')}>
-              <Text style={styles.seeAll}>Filter →</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <Ionicons name="home" size={18} color="#1e1b29" style={{ marginRight: 6 }} />
+              <Text style={styles.sectionTitle}>All Hostels</Text>
+            </View>
+            <TouchableOpacity onPress={() => navigation.navigate('HostelList')}>
+              <Text style={styles.seeAll}>See All →</Text>
             </TouchableOpacity>
           </View>
 
           {loading ? (
-            <ActivityIndicator color="#7c3aed" style={{ marginTop: 20 }} />
+            <ActivityIndicator color="#4F46E5" style={{ marginTop: 20 }} />
           ) : (
             <FlatList
               data={filteredHostels}
@@ -270,10 +307,10 @@ export default function HomeScreen({ navigation }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8f6fc'
+    backgroundColor: '#F9FAFB'
   },
   hero: {
-    backgroundColor: '#7c3aed',
+    backgroundColor: '#4F46E5',
     paddingTop: 20,
     paddingHorizontal: 20,
     paddingBottom: 30,
@@ -347,6 +384,33 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#a09abc'
   },
+  quickActions: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 24,
+    paddingHorizontal: 10
+  },
+  qaBtn: {
+    alignItems: 'center',
+    gap: 8
+  },
+  qaIconWrap: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.3)'
+  },
+  qaIcon: {
+    fontSize: 22
+  },
+  qaText: {
+    color: '#ffffff',
+    fontSize: 12,
+    fontWeight: '600'
+  },
   filterSection: {
     backgroundColor: '#ffffff',
     borderBottomWidth: 1,
@@ -363,11 +427,11 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     borderWidth: 1,
     borderColor: 'rgba(124,58,237,0.15)',
-    backgroundColor: '#f8f6fc'
+    backgroundColor: '#ffffff'
   },
   filterPillActive: {
-    backgroundColor: '#7c3aed',
-    borderColor: '#7c3aed'
+    backgroundColor: '#4F46E5',
+    borderColor: '#4F46E5'
   },
   filterPillText: {
     fontSize: 12,
@@ -388,7 +452,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     borderWidth: 1,
     borderColor: 'rgba(124,58,237,0.1)',
-    shadowColor: '#7c3aed',
+    shadowColor: '#4F46E5',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.06,
     shadowRadius: 12,
@@ -401,7 +465,7 @@ const styles = StyleSheet.create({
   statNum: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: '#7c3aed'
+    color: '#4F46E5'
   },
   statLabel: {
     fontSize: 11,
@@ -431,7 +495,7 @@ const styles = StyleSheet.create({
   },
   seeAll: {
     fontSize: 13,
-    color: '#7c3aed',
+    color: '#4F46E5',
     fontWeight: '600'
   },
   horizontalList: {
@@ -463,7 +527,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     borderWidth: 1,
     borderColor: 'rgba(124,58,237,0.1)',
-    shadowColor: '#7c3aed',
+    shadowColor: '#4F46E5',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.08,
     shadowRadius: 12,
@@ -471,8 +535,8 @@ const styles = StyleSheet.create({
   },
   cardImagePlaceholder: {
     height: 110,
-    backgroundColor: 'linear-gradient(135deg, #ede9fe, #c4b5fd)',
-    backgroundColor: '#ede9fe',
+    backgroundColor: 'linear-gradient(135deg, #EEF2FF, #c4b5fd)',
+    backgroundColor: '#EEF2FF',
     alignItems: 'center',
     justifyContent: 'center',
     position: 'relative'
@@ -547,7 +611,7 @@ const styles = StyleSheet.create({
   },
   cardColleges: {
     fontSize: 11,
-    color: '#7c3aed',
+    color: '#4F46E5',
     marginBottom: 8
   },
   cardFooterRow: {
@@ -566,7 +630,7 @@ const styles = StyleSheet.create({
   cardRent: {
     fontSize: 14,
     fontWeight: 'bold',
-    color: '#7c3aed'
+    color: '#4F46E5'
   },
   genderChip: {
     backgroundColor: '#f0ecfd',
@@ -617,7 +681,7 @@ const styles = StyleSheet.create({
   compactRent: {
     fontSize: 13,
     fontWeight: 'bold',
-    color: '#7c3aed'
+    color: '#4F46E5'
   },
   compactRight: {
     alignItems: 'center',

@@ -1,6 +1,6 @@
 export const COLORS = {
   // Brand color scheme
-  primary: '#7c3aed', // Purple brand color
+  primary: '#4F46E5', // Purple brand color
   primaryDark: '#6d28d9',
   primaryGlow: 'rgba(124, 58, 237, 0.08)',
   

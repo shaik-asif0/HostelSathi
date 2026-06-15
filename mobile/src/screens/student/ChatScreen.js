@@ -1,259 +1,152 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View, Text, StyleSheet, FlatList, TextInput, TouchableOpacity,
-  SafeAreaView, KeyboardAvoidingView, Platform, ActivityIndicator, Alert
+  KeyboardAvoidingView, Platform, SafeAreaView, ActivityIndicator
 } from 'react-native';
-import { useSelector, useDispatch } from 'react-redux';
-import axios from 'axios';
-import { loadMessages, appendMessage, receiveMessage, setActiveConversation, setChatLoading } from '../../redux/chatSlice';
-import { initSocket, joinChatRoom, sendSocketMessage, emitTyping, getSocket } from '../../utils/socket';
-
-const API_BASE = 'http://10.0.2.2:5000/api';
+import { useSelector } from 'react-redux';
+import apiClient from '../../api/apiClient';
+import { initSocket } from '../../utils/socket';
 
 export default function ChatScreen({ route, navigation }) {
+  // Params passed from navigation
   const { hostelId, hostelName, ownerId, ownerName } = route.params;
-  const dispatch = useDispatch();
-  const { user, token } = useSelector(state => state.auth);
-  const { conversations } = useSelector(state => state.chat);
+  const { user } = useSelector(state => state.auth);
 
-  const [messageText, setMessageText] = useState('');
+  const [messages, setMessages] = useState([]);
+  const [inputText, setInputText] = useState('');
   const [loading, setLoading] = useState(true);
-  const [isTyping, setIsTyping] = useState(false);
-  const [otherTyping, setOtherTyping] = useState(false);
 
-  const flatListRef = useRef(null);
-  const typingTimeoutRef = useRef(null);
+  const flatListRef = useRef();
 
-  const messages = conversations[hostelId] || [];
-  const receiverId = user.role === 'student' ? ownerId : route.params.studentId;
-  const receiverName = user.role === 'student' ? ownerName : route.params.studentName;
-
-  // Set navigation title
   useEffect(() => {
-    navigation.setOptions({
-      title: `Chat — ${hostelName}`,
-      headerStyle: { backgroundColor: '#ffffff' },
-      headerTintColor: '#7c3aed'
-    });
-  }, [hostelName]);
+    // Set dynamic header title
+    navigation.setOptions({ title: ownerName || 'Chat' });
 
-  // Set active conversation in store
-  useEffect(() => {
-    dispatch(setActiveConversation(hostelId));
-    return () => dispatch(setActiveConversation(null));
-  }, [hostelId]);
-
-  // Fetch existing chat history
-  useEffect(() => {
     fetchMessages();
-    setupSocket();
-  }, [hostelId]);
+
+    const userId = user._id || user.id;
+    const socket = initSocket(userId);
+    socket.emit('join_chat', { hostelId, userId });
+
+    // Listeners
+    socket.on('receive_message', handleIncomingMessage);
+    socket.on('message_sent', handleIncomingMessage); // Local echo from server
+
+    return () => {
+      socket.off('receive_message', handleIncomingMessage);
+      socket.off('message_sent', handleIncomingMessage);
+    };
+  }, []);
+
+  const handleIncomingMessage = (msg) => {
+    // Only accept messages for this chat
+    if (msg.hostel === hostelId) {
+      setMessages(prev => {
+        // Prevent duplicates
+        if (prev.find(m => m._id === msg._id)) return prev;
+        return [...prev, msg];
+      });
+      // Scroll to bottom
+      setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
+    }
+  };
 
   const fetchMessages = async () => {
     try {
-      setLoading(true);
-      const res = await axios.get(`${API_BASE}/messages/${hostelId}`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const isOwner = user.role === 'owner';
+      const studentId = isOwner ? ownerId : undefined;
+      // If owner, the ownerId passed is actually the student's ID!
+
+      const endpoint = studentId
+        ? `/messages/${hostelId}/${studentId}`
+        : `/messages/${hostelId}`;
+
+      const res = await apiClient.get(endpoint);
       if (res.data.success) {
-        dispatch(loadMessages({ hostelId, messages: res.data.messages }));
+        setMessages(res.data.messages || []);
+        setTimeout(() => flatListRef.current?.scrollToEnd({ animated: false }), 100);
       }
     } catch (err) {
-      console.error('Fetch messages error:', err.message);
+      console.error('Fetch messages error:', err);
     } finally {
       setLoading(false);
     }
   };
 
-  const setupSocket = useCallback(() => {
-    const socket = initSocket(user.id || user._id);
-    joinChatRoom(hostelId, user.id || user._id);
+  const sendMessage = async () => {
+    if (!inputText.trim()) return;
+    const content = inputText.trim();
+    setInputText('');
 
-    socket.on('receive_message', (data) => {
-      if (data.hostelId === hostelId || data.hostel === hostelId) {
-        dispatch(receiveMessage({ hostelId, message: data }));
-        scrollToBottom();
+    // Send via REST API (which triggers the socket emission internally, or we can emit directly)
+    try {
+      const res = await apiClient.post('/messages', {
+        hostelId,
+        receiverId: ownerId,
+        content
+      });
+      if (res.data.success) {
+        // We could manually append, but the server will emit 'message_sent' / 'receive_message'
+        handleIncomingMessage(res.data.message);
       }
-    });
-
-    socket.on('message_sent', (message) => {
-      dispatch(appendMessage({ hostelId, message }));
-      scrollToBottom();
-    });
-
-    socket.on('user_typing', ({ userId, isTyping: typing }) => {
-      if (userId !== (user.id || user._id)) {
-        setOtherTyping(typing);
-      }
-    });
-
-    return () => {
-      socket.off('receive_message');
-      socket.off('message_sent');
-      socket.off('user_typing');
-    };
-  }, [hostelId, user]);
-
-  const scrollToBottom = () => {
-    setTimeout(() => {
-      flatListRef.current?.scrollToEnd({ animated: true });
-    }, 100);
-  };
-
-  const handleSend = async () => {
-    const content = messageText.trim();
-    if (!content || !receiverId) return;
-
-    setMessageText('');
-
-    const userId = user.id || user._id;
-    const messageData = {
-      hostelId,
-      senderId: userId,
-      senderName: user.name,
-      senderRole: user.role,
-      receiverId,
-      content
-    };
-
-    // Try socket first, fallback to REST
-    const sent = sendSocketMessage(messageData);
-    if (!sent) {
-      // REST fallback
-      try {
-        const res = await axios.post(`${API_BASE}/messages`, {
-          hostelId,
-          receiverId,
-          content
-        }, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-        if (res.data.success) {
-          dispatch(appendMessage({ hostelId, message: res.data.message }));
-          scrollToBottom();
-        }
-      } catch (err) {
-        Alert.alert('Error', 'Failed to send message. Please try again.');
-        setMessageText(content); // restore
-      }
-    }
-  };
-
-  const handleTyping = (text) => {
-    setMessageText(text);
-    if (receiverId) {
-      const userId = user.id || user._id;
-      emitTyping(hostelId, userId, receiverId, text.length > 0);
-      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
-      typingTimeoutRef.current = setTimeout(() => {
-        emitTyping(hostelId, userId, receiverId, false);
-      }, 2000);
+    } catch (err) {
+      console.error('Send message error:', err);
     }
   };
 
   const renderMessage = ({ item }) => {
-    const isMine = item.sender === (user.id || user._id) || item.senderName === user.name;
-    const time = new Date(item.createdAt).toLocaleTimeString('en-IN', {
-      hour: '2-digit', minute: '2-digit'
-    });
-
+    const isMe = item.sender === (user._id || user.id);
     return (
-      <View style={[styles.msgRow, isMine ? styles.msgRowMine : styles.msgRowOther]}>
-        {!isMine && (
-          <View style={styles.avatarSmall}>
-            <Text style={styles.avatarText}>{(item.senderName || 'U').charAt(0).toUpperCase()}</Text>
-          </View>
-        )}
-        <View style={[styles.bubble, isMine ? styles.bubbleMine : styles.bubbleOther]}>
-          {!isMine && (
-            <Text style={styles.senderLabel}>{item.senderName}</Text>
-          )}
-          <Text style={[styles.bubbleText, isMine ? styles.bubbleTextMine : styles.bubbleTextOther]}>
+      <View style={[styles.msgWrapper, isMe ? styles.msgWrapperRight : styles.msgWrapperLeft]}>
+        <View style={[styles.msgBubble, isMe ? styles.msgBubbleRight : styles.msgBubbleLeft]}>
+          <Text style={[styles.msgText, isMe ? styles.msgTextRight : styles.msgTextLeft]}>
             {item.content}
           </Text>
-          <View style={styles.msgMeta}>
-            <Text style={[styles.msgTime, isMine ? { color: 'rgba(255,255,255,0.65)' } : { color: '#a09abc' }]}>
-              {time}
-            </Text>
-            {isMine && (
-              <Text style={styles.readReceipt}>{item.read ? '✓✓' : '✓'}</Text>
-            )}
-          </View>
         </View>
+        <Text style={styles.timeText}>
+          {new Date(item.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+        </Text>
       </View>
     );
   };
 
   return (
-    <SafeAreaView style={styles.container}>
-      {/* Chat Header */}
-      <View style={styles.chatHeader}>
-        <View style={styles.chatAvatar}>
-          <Text style={styles.chatAvatarText}>{(receiverName || 'U').charAt(0).toUpperCase()}</Text>
-        </View>
-        <View>
-          <Text style={styles.chatHeaderName}>{receiverName || 'Hostel Owner'}</Text>
-          <Text style={styles.chatHeaderSub}>{hostelName}</Text>
-        </View>
-      </View>
-
+    <SafeAreaView style={styles.safe}>
       {loading ? (
-        <View style={styles.loadingBox}>
-          <ActivityIndicator size="large" color="#7c3aed" />
-          <Text style={styles.loadingText}>Loading chat history...</Text>
+        <View style={styles.centerBox}>
+          <ActivityIndicator size="large" color="#4F46E5" />
         </View>
       ) : (
         <KeyboardAvoidingView
-          style={{ flex: 1 }}
+          style={styles.container}
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-          keyboardVerticalOffset={90}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
         >
-          {/* Messages List */}
+          <View style={styles.hostelBanner}>
+            <Text style={styles.hostelBannerText}>🏠 {hostelName}</Text>
+          </View>
+
           <FlatList
             ref={flatListRef}
             data={messages}
+            keyExtractor={item => item._id}
             renderItem={renderMessage}
-            keyExtractor={(item, index) => item._id || index.toString()}
-            contentContainerStyle={styles.messagesList}
-            ListEmptyComponent={
-              <View style={styles.emptyChat}>
-                <Text style={styles.emptyChatIcon}>💬</Text>
-                <Text style={styles.emptyChatText}>Start the conversation!</Text>
-                <Text style={styles.emptyChatSub}>
-                  Ask about availability, pricing, or schedule a visit.
-                </Text>
-              </View>
-            }
-            onContentSizeChange={scrollToBottom}
+            contentContainerStyle={styles.listContainer}
+            onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: true })}
           />
 
-          {/* Typing indicator */}
-          {otherTyping && (
-            <View style={styles.typingIndicator}>
-              <Text style={styles.typingText}>{receiverName || 'Owner'} is typing...</Text>
-              <View style={styles.typingDots}>
-                <View style={[styles.dot, styles.dot1]} />
-                <View style={[styles.dot, styles.dot2]} />
-                <View style={[styles.dot, styles.dot3]} />
-              </View>
-            </View>
-          )}
-
-          {/* Input bar */}
-          <View style={styles.inputBar}>
+          <View style={styles.inputBox}>
             <TextInput
-              style={styles.textInput}
+              style={styles.input}
               placeholder="Type a message..."
-              placeholderTextColor="#a09abc"
-              value={messageText}
-              onChangeText={handleTyping}
+              value={inputText}
+              onChangeText={setInputText}
               multiline
-              maxLength={1000}
             />
             <TouchableOpacity
-              style={[styles.sendBtn, !messageText.trim() ? styles.sendBtnDisabled : null]}
-              onPress={handleSend}
-              disabled={!messageText.trim()}
+              style={[styles.sendBtn, !inputText.trim() && { opacity: 0.5 }]}
+              onPress={sendMessage}
+              disabled={!inputText.trim()}
             >
               <Text style={styles.sendIcon}>➤</Text>
             </TouchableOpacity>
@@ -265,210 +158,34 @@ export default function ChatScreen({ route, navigation }) {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#f5f3fb'
+  safe: { flex: 1, backgroundColor: '#F9FAFB' },
+  container: { flex: 1 },
+  hostelBanner: { backgroundColor: '#EEF2FF', paddingVertical: 6, alignItems: 'center' },
+  hostelBannerText: { fontSize: 12, color: '#312E81', fontWeight: 'bold' },
+  listContainer: { padding: 16, flexGrow: 1, justifyContent: 'flex-end' },
+  msgWrapper: { marginBottom: 16, maxWidth: '80%' },
+  msgWrapperLeft: { alignSelf: 'flex-start' },
+  msgWrapperRight: { alignSelf: 'flex-end', alignItems: 'flex-end' },
+  msgBubble: { paddingHorizontal: 16, paddingVertical: 10, borderRadius: 20 },
+  msgBubbleLeft: { backgroundColor: '#fff', borderBottomLeftRadius: 4, borderWidth: 1, borderColor: '#f1f1f1' },
+  msgBubbleRight: { backgroundColor: '#4F46E5', borderBottomRightRadius: 4 },
+  msgText: { fontSize: 15, lineHeight: 20 },
+  msgTextLeft: { color: '#1e1b29' },
+  msgTextRight: { color: '#fff' },
+  timeText: { fontSize: 10, color: '#a09abc', marginTop: 4, marginHorizontal: 4 },
+  inputBox: {
+    flexDirection: 'row', padding: 12, backgroundColor: '#fff',
+    borderTopWidth: 1, borderTopColor: '#f1f1f1', alignItems: 'center'
   },
-  chatHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#ffffff',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(124, 58, 237, 0.1)',
-    gap: 12
-  },
-  chatAvatar: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    backgroundColor: '#7c3aed',
-    alignItems: 'center',
-    justifyContent: 'center'
-  },
-  chatAvatarText: {
-    color: '#ffffff',
-    fontWeight: 'bold',
-    fontSize: 18
-  },
-  chatHeaderName: {
-    fontSize: 15,
-    fontWeight: 'bold',
-    color: '#1e1b29'
-  },
-  chatHeaderSub: {
-    fontSize: 12,
-    color: '#8b85a3',
-    marginTop: 1
-  },
-  loadingBox: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: 12
-  },
-  loadingText: {
-    color: '#8b85a3',
-    fontSize: 14
-  },
-  messagesList: {
-    padding: 16,
-    paddingBottom: 8
-  },
-  emptyChat: {
-    alignItems: 'center',
-    paddingTop: 60,
-    paddingHorizontal: 32
-  },
-  emptyChatIcon: {
-    fontSize: 48,
-    marginBottom: 16
-  },
-  emptyChatText: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#1e1b29',
-    marginBottom: 8
-  },
-  emptyChatSub: {
-    fontSize: 14,
-    color: '#8b85a3',
-    textAlign: 'center',
-    lineHeight: 20
-  },
-  msgRow: {
-    flexDirection: 'row',
-    marginBottom: 12,
-    alignItems: 'flex-end'
-  },
-  msgRowMine: {
-    justifyContent: 'flex-end'
-  },
-  msgRowOther: {
-    justifyContent: 'flex-start'
-  },
-  avatarSmall: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: '#e9e5f8',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 8
-  },
-  avatarText: {
-    fontSize: 12,
-    fontWeight: 'bold',
-    color: '#7c3aed'
-  },
-  bubble: {
-    maxWidth: '75%',
-    borderRadius: 16,
-    padding: 12,
-    paddingBottom: 8
-  },
-  bubbleMine: {
-    backgroundColor: '#7c3aed',
-    borderBottomRightRadius: 4
-  },
-  bubbleOther: {
-    backgroundColor: '#ffffff',
-    borderBottomLeftRadius: 4,
-    borderWidth: 1,
-    borderColor: 'rgba(124,58,237,0.1)'
-  },
-  senderLabel: {
-    fontSize: 11,
-    fontWeight: 'bold',
-    color: '#7c3aed',
-    marginBottom: 4
-  },
-  bubbleText: {
-    fontSize: 14,
-    lineHeight: 20
-  },
-  bubbleTextMine: {
-    color: '#ffffff'
-  },
-  bubbleTextOther: {
-    color: '#1e1b29'
-  },
-  msgMeta: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'flex-end',
-    marginTop: 4,
-    gap: 4
-  },
-  msgTime: {
-    fontSize: 10
-  },
-  readReceipt: {
-    fontSize: 10,
-    color: 'rgba(255,255,255,0.65)'
-  },
-  typingIndicator: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 8,
-    gap: 8
-  },
-  typingText: {
-    fontSize: 12,
-    color: '#8b85a3',
-    fontStyle: 'italic'
-  },
-  typingDots: {
-    flexDirection: 'row',
-    gap: 3
-  },
-  dot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: '#8b85a3'
-  },
-  dot1: { opacity: 1 },
-  dot2: { opacity: 0.6 },
-  dot3: { opacity: 0.3 },
-  inputBar: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    backgroundColor: '#ffffff',
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(124,58,237,0.1)',
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    gap: 10
-  },
-  textInput: {
-    flex: 1,
-    backgroundColor: '#f8f6fc',
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: 'rgba(124,58,237,0.15)',
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    fontSize: 14,
-    color: '#1e1b29',
-    maxHeight: 100
+  input: {
+    flex: 1, backgroundColor: '#ffffff', borderRadius: 20,
+    paddingHorizontal: 16, paddingVertical: 10, fontSize: 15,
+    maxHeight: 100, color: '#1e1b29'
   },
   sendBtn: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: '#7c3aed',
-    alignItems: 'center',
-    justifyContent: 'center'
+    width: 44, height: 44, borderRadius: 22, backgroundColor: '#4F46E5',
+    alignItems: 'center', justifyContent: 'center', marginLeft: 10
   },
-  sendBtnDisabled: {
-    backgroundColor: '#d1c7f0'
-  },
-  sendIcon: {
-    color: '#ffffff',
-    fontSize: 16,
-    fontWeight: 'bold'
-  }
+  sendIcon: { color: '#fff', fontSize: 18, fontWeight: 'bold', marginLeft: 2 },
+  centerBox: { flex: 1, justifyContent: 'center', alignItems: 'center' }
 });

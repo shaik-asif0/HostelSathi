@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, Dimensions, TouchableOpacity, ScrollView, SafeAreaView } from 'react-native';
+import Ionicons from 'react-native-vector-icons/Ionicons';
 
 const { width } = Dimensions.get('window');
 
@@ -8,17 +9,17 @@ export default function OnboardingScreen({ navigation }) {
 
   const slides = [
     {
-      emoji: '🏠',
+      icon: 'home',
       title: 'Welcome to HostelSathi',
       description: 'The #1 student hostel discovery app for Hyderabad. Built by students, for students.'
     },
     {
-      emoji: '🛡️',
+      icon: 'shield-checkmark',
       title: '100% Verified Profiles',
       description: 'We personally visit every hostel to verify food quality, WiFi speeds, safety details, and honest prices.'
     },
     {
-      emoji: '📞',
+      icon: 'call',
       title: 'Direct Connection',
       description: 'No middlemen. Book a physical visit or request owner details directly in one click.'
     }
@@ -40,7 +41,10 @@ export default function OnboardingScreen({ navigation }) {
     <SafeAreaView style={styles.container}>
       {/* Top Header */}
       <View style={styles.header}>
-        <Text style={styles.logo}>🏠 HostelSathi</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+          <Ionicons name="home" size={20} color="#4F46E5" style={{ marginRight: 4 }} />
+          <Text style={styles.logo}>HostelSathi</Text>
+        </View>
         {activeSlide < slides.length - 1 && (
           <TouchableOpacity onPress={handleSkip}>
             <Text style={styles.skipText}>Skip</Text>
@@ -50,7 +54,7 @@ export default function OnboardingScreen({ navigation }) {
 
       {/* Slide Content */}
       <View style={styles.slideContainer}>
-        <Text style={styles.slideEmoji}>{slides[activeSlide].emoji}</Text>
+        <Ionicons name={slides[activeSlide].icon} size={72} color="#4F46E5" style={{ marginBottom: 24 }} />
         <Text style={styles.slideTitle}>{slides[activeSlide].title}</Text>
         <Text style={styles.slideDesc}>{slides[activeSlide].description}</Text>
       </View>
@@ -58,12 +62,12 @@ export default function OnboardingScreen({ navigation }) {
       {/* Slide Indicators */}
       <View style={styles.indicatorContainer}>
         {slides.map((_, i) => (
-          <View 
-            key={i} 
+          <View
+            key={i}
             style={[
-              styles.indicatorDot, 
+              styles.indicatorDot,
               i === activeSlide ? styles.indicatorDotActive : null
-            ]} 
+            ]}
           />
         ))}
       </View>
@@ -83,7 +87,7 @@ export default function OnboardingScreen({ navigation }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8f6fc',
+    backgroundColor: '#F9FAFB',
     justifyContent: 'space-between',
     padding: 24,
   },
@@ -96,7 +100,7 @@ const styles = StyleSheet.create({
   logo: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#7c3aed',
+    color: '#4F46E5',
   },
   skipText: {
     color: '#8b85a3',
@@ -107,10 +111,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     flex: 1,
     justifyContent: 'center',
-  },
-  slideEmoji: {
-    fontSize: 72,
-    marginBottom: 24,
   },
   slideTitle: {
     fontSize: 24,
@@ -140,18 +140,18 @@ const styles = StyleSheet.create({
   },
   indicatorDotActive: {
     width: 20,
-    backgroundColor: '#7c3aed',
+    backgroundColor: '#4F46E5',
   },
   footer: {
     height: 80,
     justifyContent: 'center',
   },
   nextButton: {
-    backgroundColor: '#7c3aed',
+    backgroundColor: '#4F46E5',
     padding: 16,
     borderRadius: 12,
     alignItems: 'center',
-    shadowColor: '#7c3aed',
+    shadowColor: '#4F46E5',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.15,
     shadowRadius: 10,

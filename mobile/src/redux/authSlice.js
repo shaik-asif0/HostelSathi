@@ -60,6 +60,11 @@ const authSlice = createSlice({
       } else {
         state.savedHostels.push(id);
       }
+    },
+    updateUser: (state, action) => {
+      if (state.user) {
+        state.user = { ...state.user, ...action.payload };
+      }
     }
   },
   extraReducers: (builder) => {
@@ -91,5 +96,5 @@ const authSlice = createSlice({
   }
 });
 
-export const { loginStart, loginSuccess, loginFailure, clearError, toggleSaveHostel } = authSlice.actions;
+export const { loginStart, loginSuccess, loginFailure, clearError, toggleSaveHostel, updateUser } = authSlice.actions;
 export default authSlice.reducer;
