@@ -1,87 +1,82 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, SafeAreaView, ActivityIndicator, RefreshControl } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, SafeAreaView, ActivityIndicator, RefreshControl, Image } from 'react-native';
 import { useSelector } from 'react-redux';
 import apiClient from '../../api/apiClient';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 
 export default function ConversationsScreen({ navigation }) {
   const { user } = useSelector(state => state.auth);
+  const { conversations: chatConversations, unreadCounts } = useSelector(state => state.chat);
+  const { hostels } = useSelector(state => state.hostels);
   const [conversations, setConversations] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-
-  const fetchConversations = async () => {
-    try {
-      const res = await apiClient.get('/messages/conversations/list');
-      if (res.data.success) {
-        setConversations(res.data.conversations || []);
-      }
-    } catch (err) {
-      console.error('Fetch conversations error:', err);
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  };
+  const loading = false;
+  const refreshing = false;
 
   useEffect(() => {
-    fetchConversations();
-    // Refresh when screen comes into focus
-    const unsubscribe = navigation.addListener('focus', () => {
-      fetchConversations();
+    // Transform raw messages into conversation summaries
+    const convosList = Object.keys(chatConversations).map(hostelId => {
+      const messages = chatConversations[hostelId];
+      const lastMessage = messages.length > 0 ? messages[messages.length - 1] : null;
+      const hostelInfo = hostels.find(h => h._id === hostelId) || { name: 'Unknown Hostel' };
+      
+      return {
+        _id: hostelId, // Using hostelId as the conversation ID for simulation
+        hostelInfo,
+        otherUserId: 'owner1', 
+        otherUserName: 'Hostel Owner',
+        lastMessage,
+        unreadCount: unreadCounts[hostelId] || 0
+      };
     });
-    return unsubscribe;
-  }, [navigation]);
+    // Sort by most recent
+    convosList.sort((a, b) => {
+      if (!a.lastMessage) return 1;
+      if (!b.lastMessage) return -1;
+      return new Date(b.lastMessage.createdAt) - new Date(a.lastMessage.createdAt);
+    });
+    setConversations(convosList);
+  }, [chatConversations, hostels, unreadCounts]);
 
-  const handleRefresh = useCallback(() => {
-    setRefreshing(true);
-    fetchConversations();
-  }, []);
+  const handleRefresh = useCallback(() => {}, []);
 
   const renderItem = ({ item }) => {
     const isUnread = item.unreadCount > 0;
 
     return (
       <TouchableOpacity
-        style={[styles.card, isUnread && styles.cardUnread]}
+        style={styles.chatCard}
         onPress={() => navigation.navigate('Chat', {
           hostelId: item._id,
           hostelName: item.hostelInfo?.name,
-          ownerId: item.otherUserId, // For student, this is owner. For owner, this is student.
+          ownerId: item.otherUserId,
           ownerName: item.otherUserName
         })}
+        activeOpacity={0.7}
       >
-        <View style={styles.avatar}>
-          <Text style={styles.avatarText}>
-            {(item.otherUserName || 'U').charAt(0)}
+        <Image 
+          source={{ uri: 'https://randomuser.me/api/portraits/men/32.jpg' }} // Fallback high-quality avatar
+          style={styles.avatar} 
+        />
+        
+        <View style={styles.chatInfo}>
+          <Text style={styles.chatName}>{item.otherUserName}</Text>
+          <Text style={styles.lastMessage} numberOfLines={1}>
+            {item.lastMessage?.sender === user._id ? 'You: ' : ''}
+            {item.lastMessage?.content || 'No messages yet'}
           </Text>
         </View>
-        <View style={styles.cardBody}>
-          <View style={styles.cardHeader}>
-            <Text style={[styles.nameText, isUnread && styles.boldText]} numberOfLines={1}>
-              {item.otherUserName}
-            </Text>
-            <Text style={styles.timeText}>
-              {item.lastMessage ? new Date(item.lastMessage.createdAt).toLocaleDateString() : ''}
-            </Text>
-          </View>
-          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
-            <Ionicons name="home" size={10} color="#312E81" style={{ marginRight: 4 }} />
-            <Text style={[styles.hostelText, { marginBottom: 0 }]} numberOfLines={1}>
-              {item.hostelInfo?.name || 'HostelSathi Property'}
-            </Text>
-          </View>
-          <View style={styles.msgRow}>
-            <Text style={[styles.msgText, isUnread && styles.msgTextUnread]} numberOfLines={1}>
-              {item.lastMessage?.sender === user._id ? 'You: ' : ''}
-              {item.lastMessage?.content || 'No messages yet'}
-            </Text>
-            {isUnread && (
-              <View style={styles.badge}>
-                <Text style={styles.badgeText}>{item.unreadCount}</Text>
-              </View>
-            )}
-          </View>
+
+        <View style={styles.rightSection}>
+          <Text style={[styles.timeText, isUnread && { color: '#4F46E5', fontWeight: 'bold' }]}>
+            {item.lastMessage ? new Date(item.lastMessage.createdAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : 'Just now'}
+          </Text>
+          {isUnread ? (
+            <View style={styles.unreadBadge}>
+              <Text style={styles.unreadText}>{item.unreadCount}</Text>
+            </View>
+          ) : (
+            <View style={{ height: 20 }} />
+          )}
         </View>
       </TouchableOpacity>
     );
@@ -89,11 +84,17 @@ export default function ConversationsScreen({ navigation }) {
 
   return (
     <SafeAreaView style={styles.safe}>
+      {/* Top Header */}
       <View style={styles.header}>
-        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-          <Text style={styles.headerTitle}>Messages</Text>
-          <Ionicons name="chatbubbles" size={20} color="#1e1b29" style={{ marginLeft: 6 }} />
-        </View>
+        <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
+          <Ionicons name="arrow-back" size={24} color="#1f2937" />
+        </TouchableOpacity>
+      </View>
+
+      {/* Titles */}
+      <View style={styles.titleSection}>
+        <Text style={styles.mainTitle}>Messages</Text>
+        <Text style={styles.subTitle}>All conversations</Text>
       </View>
 
       {loading ? (
@@ -120,41 +121,123 @@ export default function ConversationsScreen({ navigation }) {
           }
         />
       )}
+      
+      {/* Floating Action Button */}
+      <TouchableOpacity style={styles.fab} activeOpacity={0.8}>
+        <Ionicons name="add" size={32} color="#ffffff" />
+      </TouchableOpacity>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#F9FAFB' },
-  header: { padding: 16, backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#f1f1f1' },
-  headerTitle: { fontSize: 24, fontWeight: 'bold', color: '#1e1b29' },
-  listContainer: { padding: 16, paddingBottom: 30 },
-  card: {
-    flexDirection: 'row', backgroundColor: '#fff', padding: 14,
-    borderRadius: 12, marginBottom: 10, borderWidth: 1, borderColor: '#f1f1f1'
+  safe: {
+    flex: 1,
+    backgroundColor: '#ffffff',
   },
-  cardUnread: { backgroundColor: '#EEF2FF', borderColor: '#4F46E530' },
+  header: {
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+  },
+  backBtn: {
+    alignSelf: 'flex-start',
+    padding: 4,
+    marginLeft: -4,
+  },
+  titleSection: {
+    paddingHorizontal: 20,
+    marginBottom: 20,
+  },
+  mainTitle: {
+    fontSize: 28,
+    fontWeight: 'bold',
+    color: '#1f2937',
+    marginBottom: 4,
+  },
+  subTitle: {
+    fontSize: 16,
+    color: '#6b7280',
+  },
+  listContainer: {
+    paddingHorizontal: 20,
+    paddingBottom: 100, // Make room for FAB
+    gap: 12,
+  },
+  chatCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#ffffff',
+    borderWidth: 1,
+    borderColor: '#f3f4f6',
+    borderRadius: 16,
+    padding: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.03,
+    shadowRadius: 8,
+    elevation: 1,
+  },
   avatar: {
-    width: 50, height: 50, borderRadius: 25, backgroundColor: '#EEF2FF',
-    alignItems: 'center', justifyContent: 'center', marginRight: 14
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    marginRight: 16,
+    backgroundColor: '#e5e7eb',
   },
-  avatarText: { fontSize: 20, fontWeight: 'bold', color: '#4F46E5' },
-  cardBody: { flex: 1, justifyContent: 'center' },
-  cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 2 },
-  nameText: { fontSize: 16, fontWeight: '600', color: '#1e1b29', flex: 1 },
-  boldText: { fontWeight: 'bold' },
-  timeText: { fontSize: 11, color: '#8b85a3' },
-  hostelText: { fontSize: 12, color: '#312E81', marginBottom: 4 },
-  msgRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  msgText: { fontSize: 13, color: '#8b85a3', flex: 1, paddingRight: 10 },
-  msgTextUnread: { color: '#1e1b29', fontWeight: '500' },
-  badge: {
-    backgroundColor: '#4F46E5', borderRadius: 10, minWidth: 20, height: 20,
-    alignItems: 'center', justifyContent: 'center', paddingHorizontal: 6
+  chatInfo: {
+    flex: 1,
+    justifyContent: 'center',
   },
-  badgeText: { color: '#fff', fontSize: 10, fontWeight: 'bold' },
+  chatName: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#1f2937',
+    marginBottom: 4,
+  },
+  lastMessage: {
+    fontSize: 14,
+    color: '#6b7280',
+  },
+  rightSection: {
+    alignItems: 'flex-end',
+    justifyContent: 'space-between',
+    height: 44,
+  },
+  timeText: {
+    fontSize: 12,
+    color: '#9ca3af',
+    marginBottom: 6,
+  },
+  unreadBadge: {
+    backgroundColor: '#4F46E5',
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  unreadText: {
+    color: '#ffffff',
+    fontSize: 10,
+    fontWeight: 'bold',
+  },
+  fab: {
+    position: 'absolute',
+    bottom: 30,
+    right: 20,
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: '#4F46E5',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#4F46E5',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 5,
+  },
   centerBox: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingTop: 100 },
-  emptyEmoji: { fontSize: 50, marginBottom: 10 },
   emptyTitle: { fontSize: 18, fontWeight: 'bold', color: '#1e1b29', marginBottom: 5 },
   emptySub: { fontSize: 14, color: '#8b85a3', textAlign: 'center', paddingHorizontal: 40 }
 });

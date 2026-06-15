@@ -1,165 +1,228 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, Dimensions, TouchableOpacity, ScrollView, SafeAreaView } from 'react-native';
-import Ionicons from 'react-native-vector-icons/Ionicons';
+import React, { useState } from "react";
+import {
+  View,
+  Text,
+  StyleSheet,
+  Dimensions,
+  TouchableOpacity,
+  SafeAreaView,
+  StatusBar,
+  Image
+} from "react-native";
+import Ionicons from "react-native-vector-icons/Ionicons";
 
-const { width } = Dimensions.get('window');
+const { width } = Dimensions.get("window");
 
 export default function OnboardingScreen({ navigation }) {
   const [activeSlide, setActiveSlide] = useState(0);
 
   const slides = [
     {
-      icon: 'home',
-      title: 'Welcome to HostelSathi',
-      description: 'The #1 student hostel discovery app for Hyderabad. Built by students, for students.'
+      title: "Find Hostels\nNear Your College",
+      description: "Discover verified hostels\nnear your college easily.",
+      illustrationType: 1
     },
     {
-      icon: 'shield-checkmark',
-      title: '100% Verified Profiles',
-      description: 'We personally visit every hostel to verify food quality, WiFi speeds, safety details, and honest prices.'
+      title: "Compare Food,\nFacilities & Prices",
+      description: "Compare and choose the best\nhostel that fits your needs.",
+      illustrationType: 2
     },
     {
-      icon: 'call',
-      title: 'Direct Connection',
-      description: 'No middlemen. Book a physical visit or request owner details directly in one click.'
-    }
+      title: "Contact Owners\nInstantly",
+      description: "Chat, call or visit hostel\nowners directly.",
+      illustrationType: 3
+    },
   ];
 
   const handleNext = () => {
     if (activeSlide < slides.length - 1) {
       setActiveSlide(activeSlide + 1);
     } else {
-      navigation.replace('Auth'); // ✅ Fixed: matches new AuthStack navigator
+      navigation.replace("Auth");
     }
   };
 
   const handleSkip = () => {
-    navigation.replace('Auth');
+    navigation.replace("Auth");
+  };
+
+  const handleBack = () => {
+    if (activeSlide > 0) {
+      setActiveSlide(activeSlide - 1);
+    }
+  };
+
+  const renderIllustration = (type) => {
+    let source;
+    if (type === 1) source = require('../../assets/onboarding1.png');
+    else if (type === 2) source = require('../../assets/onboarding2.png');
+    else if (type === 3) source = require('../../assets/onboarding3.png');
+
+    return (
+      <View style={styles.illContainer}>
+        <Image source={source} style={styles.illustrationImage} resizeMode="contain" />
+      </View>
+    );
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.safeArea}>
+      <StatusBar barStyle="dark-content" backgroundColor="#fafafa" />
+      
       {/* Top Header */}
       <View style={styles.header}>
-        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-          <Ionicons name="home" size={20} color="#4F46E5" style={{ marginRight: 4 }} />
-          <Text style={styles.logo}>HostelSathi</Text>
-        </View>
-        {activeSlide < slides.length - 1 && (
-          <TouchableOpacity onPress={handleSkip}>
-            <Text style={styles.skipText}>Skip</Text>
-          </TouchableOpacity>
-        )}
+        <TouchableOpacity style={styles.backBtn} onPress={handleBack}>
+          {activeSlide > 0 ? (
+             <Ionicons name="arrow-back" size={24} color="#1f2937" />
+          ) : (
+             <View style={{ width: 24 }} />
+          )}
+        </TouchableOpacity>
       </View>
 
       {/* Slide Content */}
       <View style={styles.slideContainer}>
-        <Ionicons name={slides[activeSlide].icon} size={72} color="#4F46E5" style={{ marginBottom: 24 }} />
-        <Text style={styles.slideTitle}>{slides[activeSlide].title}</Text>
-        <Text style={styles.slideDesc}>{slides[activeSlide].description}</Text>
+        <Text style={styles.titleText}>{slides[activeSlide].title}</Text>
+        <Text style={styles.descText}>{slides[activeSlide].description}</Text>
+        
+        {/* Illustration Mockup */}
+        {renderIllustration(slides[activeSlide].illustrationType)}
       </View>
 
-      {/* Slide Indicators */}
-      <View style={styles.indicatorContainer}>
-        {slides.map((_, i) => (
-          <View
-            key={i}
-            style={[
-              styles.indicatorDot,
-              i === activeSlide ? styles.indicatorDotActive : null
-            ]}
-          />
-        ))}
-      </View>
+      {/* Bottom Footer Navigation */}
+      <View style={styles.footerContainer}>
+        
+        {/* Skip Button */}
+        <TouchableOpacity style={styles.skipBtn} onPress={handleSkip}>
+          <Text style={styles.skipText}>Skip</Text>
+        </TouchableOpacity>
 
-      {/* Button footer */}
-      <View style={styles.footer}>
-        <TouchableOpacity style={styles.nextButton} onPress={handleNext}>
-          <Text style={styles.nextButtonText}>
-            {activeSlide === slides.length - 1 ? 'Get Started' : 'Next Screen'}
+        {/* Pager Dots */}
+        <View style={styles.pagerContainer}>
+          {slides.map((_, index) => (
+            <View
+              key={index}
+              style={[
+                styles.dot,
+                index === activeSlide ? styles.activeDot : null,
+              ]}
+            />
+          ))}
+        </View>
+
+        {/* Next / Get Started Button */}
+        <TouchableOpacity style={styles.nextBtn} onPress={handleNext}>
+          <Text style={styles.nextBtnText}>
+            {activeSlide === slides.length - 1 ? "Get Started" : "Next"}
           </Text>
         </TouchableOpacity>
+
       </View>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  safeArea: {
     flex: 1,
-    backgroundColor: '#F9FAFB',
-    justifyContent: 'space-between',
-    padding: 24,
+    backgroundColor: "#fafafa", // Light background matching mockup
   },
   header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    height: 50,
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 24,
+    paddingTop: 16,
+    height: 60,
   },
-  logo: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#4F46E5',
-  },
-  skipText: {
-    color: '#8b85a3',
-    fontWeight: '600',
+  backBtn: {
+    padding: 8,
+    marginLeft: -8,
   },
   slideContainer: {
-    alignItems: 'center',
-    paddingHorizontal: 16,
     flex: 1,
-    justifyContent: 'center',
+    alignItems: "center",
+    paddingHorizontal: 32,
+    paddingTop: 20,
   },
-  slideTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#1e1b29',
-    textAlign: 'center',
-    marginBottom: 12,
+  titleText: {
+    fontSize: 26,
+    fontWeight: "bold",
+    color: "#1e1b4b", // Dark bold blueish black
+    textAlign: "center",
+    marginBottom: 16,
+    lineHeight: 36,
   },
-  slideDesc: {
-    fontSize: 15,
-    color: '#5f5a75',
-    textAlign: 'center',
-    lineHeight: 22,
-  },
-  indicatorContainer: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    height: 40,
-  },
-  indicatorDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: 'rgba(124, 58, 237, 0.15)',
-    marginHorizontal: 4,
-  },
-  indicatorDotActive: {
-    width: 20,
-    backgroundColor: '#4F46E5',
-  },
-  footer: {
-    height: 80,
-    justifyContent: 'center',
-  },
-  nextButton: {
-    backgroundColor: '#4F46E5',
-    padding: 16,
-    borderRadius: 12,
-    alignItems: 'center',
-    shadowColor: '#4F46E5',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 10,
-    elevation: 5,
-  },
-  nextButtonText: {
-    color: '#ffffff',
-    fontWeight: 'bold',
+  descText: {
     fontSize: 16,
-  }
+    color: "#6b7280",
+    textAlign: "center",
+    marginBottom: 60,
+    lineHeight: 24,
+  },
+  
+  /* Illustration Mockups */
+  illContainer: {
+    width: width,
+    height: 350,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 20,
+  },
+  illustrationImage: {
+    width: '90%',
+    height: '100%',
+  },
+
+  /* Footer */
+  footerContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 24,
+    paddingBottom: 40,
+  },
+  skipBtn: {
+    width: 80,
+    paddingVertical: 12,
+  },
+  skipText: {
+    fontSize: 16,
+    color: "#6b7280",
+    fontWeight: "600",
+  },
+  pagerContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    flex: 1,
+    gap: 6,
+  },
+  dot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: "#d1d5db",
+  },
+  activeDot: {
+    width: 16,
+    backgroundColor: "#4f46e5",
+  },
+  nextBtn: {
+    backgroundColor: "#4f46e5",
+    paddingVertical: 14,
+    paddingHorizontal: 32,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    shadowColor: "#4f46e5",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  nextBtnText: {
+    color: "#ffffff",
+    fontWeight: "bold",
+    fontSize: 16,
+  },
 });

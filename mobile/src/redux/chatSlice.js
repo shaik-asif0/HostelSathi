@@ -4,9 +4,14 @@ const chatSlice = createSlice({
   name: 'chat',
   initialState: {
     // messages keyed by hostelId for each conversation
-    conversations: {}, // { hostelId: [messages] }
+    conversations: {
+      'mock1': [
+        { _id: 'm1', sender: 'owner1', content: 'Hi! Are you interested in Miyapur Metro View PG?', createdAt: new Date(Date.now() - 3600000).toISOString() },
+        { _id: 'm2', sender: 'student', content: 'Yes, do you have single rooms available?', createdAt: new Date(Date.now() - 1800000).toISOString() }
+      ]
+    }, 
     activeHostelId: null,
-    unreadCounts: {},  // { hostelId: count }
+    unreadCounts: { 'mock1': 0 },
     totalUnread: 0,
     isConnected: false,
     loading: false,

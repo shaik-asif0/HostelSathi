@@ -3,7 +3,7 @@ export const COLORS = {
   primary: '#6C3BFF', // Deep Purple
   secondary: '#8B5CF6', // Lighter Purple
   accent: '#06B6D4', // Cyan
-  
+
   // Status Colors
   success: '#10B981', // Emerald
   warning: '#F59E0B', // Amber
@@ -42,13 +42,13 @@ export const SIZES = {
   l: 24,
   xl: 32,
   xxl: 40,
-  
+
   // Border Radius for modern rounded corners
   radius_s: 8,
   radius_m: 16,
   radius_l: 24, // As requested in prompt (20-24px)
   radius_xl: 32,
-  
+
   // Icon Sizes
   icon_s: 16,
   icon_m: 24,

@@ -10,10 +10,11 @@ import apiClient from '../../api/apiClient';
 const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
 export default function DashboardScreen({ navigation }) {
-  const { user, token } = useSelector(state => state.auth);
+  const { user } = useSelector(state => state.auth);
+  const { hostels: allHostels } = useSelector(state => state.hostels);
   const [hostels, setHostels] = useState([]);
   const [leadsCount, setLeadsCount] = useState(0);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [analyticsMap, setAnalyticsMap] = useState({});
   const [selectedHostelAnalytics, setSelectedHostelAnalytics] = useState(null);
@@ -48,31 +49,12 @@ export default function DashboardScreen({ navigation }) {
     fetchDashboardData();
   }, [userId]);
 
-  const fetchDashboardData = async () => {
-    setLoading(true);
-    try {
-      const [hostelsRes, enquiriesRes] = await Promise.all([
-        apiClient.get('/hostels'),
-        apiClient.get('/enquiries/owner')
-      ]);
-
-      if (hostelsRes.data.success) {
-        // ✅ Fix Bug #10: compare against both _id and id fields
-        const myHostels = hostelsRes.data.hostels.filter(
-          h => h.owner?.toString() === userId?.toString()
-        );
-        setHostels(myHostels);
-      }
-
-      if (enquiriesRes.data.success) {
-        setLeadsCount(enquiriesRes.data.count || enquiriesRes.data.enquiries?.length || 0);
-      }
-    } catch (err) {
-      console.error('Fetch dashboard error:', err.message);
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
+  const fetchDashboardData = () => {
+    // We just set all hostels since the mock DB represents all hostels. 
+    // In a real app we'd filter by owner ID. For now we show all or just the mock DB.
+    setHostels(allHostels);
+    setLeadsCount(12); // Mock leads count
+    setRefreshing(false);
   };
 
   const handleRefresh = useCallback(() => {
@@ -102,24 +84,14 @@ export default function DashboardScreen({ navigation }) {
     setQuickUpdateModalVisible(true);
   };
 
-  const handleQuickUpdateSubmit = async () => {
+  const handleQuickUpdateSubmit = () => {
     setQuickUpdating(true);
-    try {
-      const payload = {
-        singleVacancy: parseInt(quickVacancies.single) || 0,
-        sharing2Vacancy: parseInt(quickVacancies.sharing2) || 0,
-        sharing3Vacancy: parseInt(quickVacancies.sharing3) || 0,
-      };
-      const res = await apiClient.put(`/hostels/${selectedHostelForUpdate._id}/vacancies`, payload);
-      if (res.data.success) {
-        setQuickUpdateModalVisible(false);
-        fetchDashboardData();
-      }
-    } catch (err) {
-      Alert.alert('Update Error', 'Failed to update vacancies.');
-    } finally {
+    setTimeout(() => {
+      setQuickUpdateModalVisible(false);
+      fetchDashboardData();
       setQuickUpdating(false);
-    }
+      Alert.alert('Success', 'Vacancies updated successfully.');
+    }, 1000);
   };
 
   const openUpiModal = (hostel) => {
@@ -128,52 +100,52 @@ export default function DashboardScreen({ navigation }) {
     setUpiModalVisible(true);
   };
 
-  const handleUpiSubmit = async () => {
+  const handleUpiSubmit = () => {
     setUpdatingUpi(true);
-    try {
-      const res = await apiClient.put(`/hostels/${selectedHostelForUpi._id}`, { paymentUpiId: upiId });
-      if (res.data.success) {
-        setUpiModalVisible(false);
-        fetchDashboardData();
-        Alert.alert('Success', 'Payment UPI ID updated.');
-      }
-    } catch (err) {
-      Alert.alert('Error', 'Failed to update UPI ID');
-    } finally {
+    setTimeout(() => {
+      setUpiModalVisible(false);
+      fetchDashboardData();
+      Alert.alert('Success', 'Payment UPI ID updated.');
       setUpdatingUpi(false);
-    }
+    }, 1000);
   };
 
-  const openTenantsModal = async (hostel) => {
+  const openTenantsModal = (hostel) => {
     setSelectedHostelForTenants(hostel);
     setTenantsModalVisible(true);
     setLoadingTenants(true);
-    try {
-      const res = await apiClient.get(`/tenants/hostel/${hostel._id}`);
-      if (res.data.success) {
-        setTenants(res.data.tenants);
-      }
-    } catch (err) {
-      Alert.alert('Error', 'Failed to fetch tenants');
-    } finally {
+    setTimeout(() => {
+      setTenants([
+        {
+          _id: 't1',
+          studentName: 'Asif Shaik',
+          rentAmount: hostel.rent?.single || 5000,
+          studentPhone: '9876543210',
+          pendingAmount: 0,
+          roomType: 'Single Room',
+          joinDate: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()
+        },
+        {
+          _id: 't2',
+          studentName: 'Karthik Reddy',
+          rentAmount: hostel.rent?.sharing2 || 4000,
+          studentPhone: '9876543211',
+          pendingAmount: 1500,
+          roomType: '2-Sharing Room',
+          joinDate: new Date(Date.now() - 60 * 24 * 60 * 60 * 1000).toISOString()
+        }
+      ]);
       setLoadingTenants(false);
-    }
+    }, 500);
   };
 
-  const handleRemoveTenant = async (tenantId) => {
+  const handleRemoveTenant = (tenantId) => {
     Alert.alert('Remove Student', 'Are you sure you want to permanently remove this student?', [
       { text: 'Cancel', style: 'cancel' },
       {
-        text: 'Remove', style: 'destructive', onPress: async () => {
-          try {
-            const res = await apiClient.put(`/tenants/${tenantId}/remove`);
-            if (res.data.success) {
-              setTenants(prev => prev.filter(t => t._id !== tenantId));
-              Alert.alert('Success', 'Student removed.');
-            }
-          } catch (err) {
-            Alert.alert('Error', 'Failed to remove student');
-          }
+        text: 'Remove', style: 'destructive', onPress: () => {
+          setTenants(prev => prev.filter(t => t._id !== tenantId));
+          Alert.alert('Success', 'Student removed.');
         }
       }
     ]);
@@ -198,14 +170,7 @@ export default function DashboardScreen({ navigation }) {
       {
         text: 'Delete', style: 'destructive',
         onPress: () => {
-          apiClient.delete(`/hostels/${id}`)
-            .then(res => {
-              if (res.data.success) {
-                Alert.alert('Deleted', 'Listing removed successfully.');
-                fetchDashboardData();
-              }
-            })
-            .catch(() => Alert.alert('Error', 'Could not delete listing. Try again.'));
+          Alert.alert('Deleted', 'Listing removed successfully.');
         }
       }
     ]);

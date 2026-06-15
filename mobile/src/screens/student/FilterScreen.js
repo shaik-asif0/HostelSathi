@@ -1,69 +1,47 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, SafeAreaView } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { 
+  View, Text, StyleSheet, TouchableOpacity, ScrollView, SafeAreaView, StatusBar 
+} from 'react-native';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 
-const STORAGE_KEYS = { FILTERS: 'hs_persisted_filters' };
-const AMENITIES_LIST = ['WiFi', 'AC', 'Laundry', 'Geyser', 'CCTV', 'Power Backup', 'Gym', 'Security Guard', 'Parking', 'Hot Water', 'RO Water', 'Fridge'];
-const COLLEGE_LIST = [
-  'JNTU Hyderabad', 'Osmania University', 'GRIET', 'CBIT', 'VNR VJIET',
-  'MGIT', 'BVRIT', 'Ameerpet IT Hub', 'Narayana College', 'SR Nagar Institutes',
-  'Nizam College', 'IIT Hyderabad', 'ISB Hyderabad', 'University of Hyderabad', 'KVR College'
-];
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
-export default function FilterScreen({ navigation, route }) {
-  const [gender, setGender] = useState('all');
+const STORAGE_KEYS = { FILTERS: 'hs_persisted_filters' };
+
+export default function FilterScreen({ navigation }) {
   const [maxRent, setMaxRent] = useState(15000);
-  const [foodIncluded, setFoodIncluded] = useState(false);
-  const [foodType, setFoodType] = useState('all');
-  const [college, setCollege] = useState('');
+  const [distance, setDistance] = useState('5 km');
+  const [food, setFood] = useState('Both');
+  const [sharing, setSharing] = useState('Any');
+  const [gender, setGender] = useState('Any');
+  const [minRating, setMinRating] = useState(0);
   const [selectedAmenities, setSelectedAmenities] = useState([]);
 
   useEffect(() => {
-    loadPersistedData();
+    AsyncStorage.getItem(STORAGE_KEYS.FILTERS).then(res => {
+      if (res) {
+        const f = JSON.parse(res);
+        if (f.maxRent) setMaxRent(f.maxRent);
+        if (f.distance) setDistance(f.distance);
+        if (f.food) setFood(f.food);
+        if (f.sharing) setSharing(f.sharing);
+        if (f.gender) setGender(f.gender);
+        if (f.minRating !== undefined) setMinRating(f.minRating);
+        if (f.selectedAmenities) setSelectedAmenities(f.selectedAmenities);
+      }
+    });
   }, []);
 
-  const loadPersistedData = async () => {
-    try {
-      const filtersJson = await AsyncStorage.getItem(STORAGE_KEYS.FILTERS);
-      if (filtersJson) {
-        const f = JSON.parse(filtersJson);
-        setGender(f.gender || 'all');
-        setMaxRent(f.maxRent || 15000);
-        setFoodIncluded(f.foodIncluded || false);
-        setFoodType(f.foodType || 'all');
-        setSelectedAmenities(f.selectedAmenities || []);
-        setCollege(f.college || '');
-      }
-    } catch (err) {
-      console.error(err);
-    }
-  };
-
-  const persistFiltersAndApply = async () => {
-    try {
-      const filters = { gender, maxRent, foodIncluded, foodType, selectedAmenities, college };
-      await AsyncStorage.setItem(STORAGE_KEYS.FILTERS, JSON.stringify(filters));
-      // Pass a param back to let the previous screen know filters were applied
-      navigation.navigate({
-        name: route.params?.returnTo || 'HostelList',
-        params: { filtersUpdated: Date.now() },
-        merge: true,
-      });
-    } catch (err) {
-      console.error(err);
-    }
-  };
-
-  const resetFilters = async () => {
-    setGender('all');
-    setMaxRent(15000);
-    setFoodIncluded(false);
-    setFoodType('all');
-    setSelectedAmenities([]);
-    setCollege('');
-    await AsyncStorage.removeItem(STORAGE_KEYS.FILTERS);
-  };
+  const amenitiesList = [
+    { name: 'WiFi', icon: 'wifi-outline' },
+    { name: 'Laundry', icon: 'shirt-outline' },
+    { name: 'RO Water', icon: 'water-outline' },
+    { name: 'Gym', icon: 'barbell-outline' },
+    { name: 'Parking', icon: 'car-outline' },
+    { name: 'AC', icon: 'snow-outline' },
+    { name: 'Power Backup', icon: 'flash-outline' },
+    { name: 'CCTV', icon: 'videocam-outline' },
+  ];
 
   const handleAmenityToggle = (amenity) => {
     setSelectedAmenities(prev =>
@@ -71,130 +49,188 @@ export default function FilterScreen({ navigation, route }) {
     );
   };
 
+  const resetFilters = async () => {
+    setMaxRent(15000);
+    setDistance('5 km');
+    setFood('Both');
+    setSharing('Any');
+    setGender('Any');
+    setMinRating(0);
+    setSelectedAmenities([]);
+    await AsyncStorage.removeItem(STORAGE_KEYS.FILTERS);
+    navigation.navigate('Search', { filtersUpdated: Date.now() });
+  };
+
+  const applyFilters = async () => {
+    const f = { maxRent, distance, food, sharing, gender, minRating, selectedAmenities };
+    await AsyncStorage.setItem(STORAGE_KEYS.FILTERS, JSON.stringify(f));
+    navigation.navigate('Search', { filtersUpdated: Date.now() });
+  };
+
   return (
     <SafeAreaView style={styles.container}>
+      <StatusBar barStyle="dark-content" backgroundColor="#ffffff" />
+      
+      {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.closeBtn}>
-          <Ionicons name="close" size={24} color="#1e1b29" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Filters</Text>
+        <View style={styles.headerLeft}>
+          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
+            <Ionicons name="chevron-back" size={24} color="#1f2937" />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Filters</Text>
+        </View>
         <TouchableOpacity onPress={resetFilters}>
-          <Text style={styles.resetBtn}>Clear All</Text>
+          <Text style={styles.resetBtnText}>Reset</Text>
         </TouchableOpacity>
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
-        {/* Gender */}
-        <Text style={styles.filterLabel}>Who is this for?</Text>
-        <View style={styles.filterOptions}>
-          {['all', 'boys', 'girls', 'both'].map(g => (
-            <TouchableOpacity
-              key={g}
-              style={[styles.optionBtn, gender === g && styles.optionBtnActive]}
-              onPress={() => setGender(g)}
-            >
-              <Text style={[styles.optionText, gender === g && styles.optionTextActive]}>
-                {g === 'all' ? 'Anyone' : g === 'both' ? 'Co-living' : g.charAt(0).toUpperCase() + g.slice(1)}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-
-        {/* Budget */}
-        <Text style={styles.filterLabel}>Max Monthly Rent: ₹{maxRent.toLocaleString('en-IN')}</Text>
-        <View style={styles.budgetRow}>
-          {[5000, 8000, 10000, 12000, 15000, 20000].map(b => (
-            <TouchableOpacity
-              key={b}
-              style={[styles.budgetBtn, maxRent === b && styles.budgetBtnActive]}
-              onPress={() => setMaxRent(b)}
-            >
-              <Text style={[styles.budgetText, maxRent === b && styles.budgetTextActive]}>
-                ₹{(b / 1000).toFixed(0)}K
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-
-        {/* Food */}
-        <Text style={styles.filterLabel}>Food Preferences</Text>
-        <TouchableOpacity
-          style={[styles.toggleRow, foodIncluded && styles.toggleRowActive]}
-          onPress={() => setFoodIncluded(!foodIncluded)}
-        >
-          <View style={{flexDirection: 'row', alignItems: 'center'}}>
-            <Ionicons name="restaurant" size={16} color={foodIncluded ? '#4F46E5' : '#5f5a75'} style={{marginRight: 6}} />
-            <Text style={[styles.toggleText, foodIncluded && styles.toggleTextActive]}>
-              Food Included in Rent
-            </Text>
-          </View>
-          <View style={[styles.toggle, foodIncluded && styles.toggleOn]}>
-            <View style={styles.toggleThumb} />
-          </View>
-        </TouchableOpacity>
-
-        {foodIncluded && (
-          <View style={[styles.filterOptions, { marginTop: 12 }]}>
-            {['all', 'veg', 'nonveg', 'both'].map(t => (
+        
+        {/* Price Range */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Max Rent per Month</Text>
+          <View style={styles.chipsRow}>
+            {[{label: 'Under ₹5k', val: 5000}, {label: 'Under ₹8k', val: 8000}, {label: 'Under ₹12k', val: 12000}, {label: 'Any', val: 15000}].map(item => (
               <TouchableOpacity
-                key={t}
-                style={[styles.optionBtn, foodType === t && styles.optionBtnActive]}
-                onPress={() => setFoodType(t)}
+                key={item.label}
+                style={[styles.chip, maxRent === item.val ? styles.chipActive : styles.chipInactive]}
+                onPress={() => setMaxRent(item.val)}
               >
-                <Text style={[styles.optionText, foodType === t && styles.optionTextActive]}>
-                  {t === 'all' ? 'Any Type' : t.charAt(0).toUpperCase() + t.slice(1)}
+                <Text style={maxRent === item.val ? styles.chipTextActive : styles.chipTextInactive}>
+                  {item.label}
                 </Text>
               </TouchableOpacity>
             ))}
           </View>
-        )}
-
-        {/* College Filter */}
-        <View style={{flexDirection: 'row', alignItems: 'center', marginBottom: 12, marginTop: 24}}>
-          <Ionicons name="school" size={16} color="#1e1b29" style={{marginRight: 6}} />
-          <Text style={[styles.filterLabel, {marginTop: 0, marginBottom: 0}]}>Nearby College / Landmark</Text>
         </View>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 8 }}>
-          <View style={styles.filterOptions}>
-            <TouchableOpacity
-              style={[styles.optionBtn, !college && styles.optionBtnActive]}
-              onPress={() => setCollege('')}
-            >
-              <Text style={[styles.optionText, !college && styles.optionTextActive]}>Anywhere</Text>
-            </TouchableOpacity>
-            {COLLEGE_LIST.map(c => (
+
+        {/* Distance */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Distance</Text>
+          <View style={styles.chipsRow}>
+            {['1 km', '3 km', '5 km', '10 km'].map(item => (
               <TouchableOpacity
-                key={c}
-                style={[styles.optionBtn, college === c && styles.optionBtnActive]}
-                onPress={() => setCollege(college === c ? '' : c)}
+                key={item}
+                style={[styles.chip, distance === item ? styles.chipActive : styles.chipInactive]}
+                onPress={() => setDistance(item)}
               >
-                <Text style={[styles.optionText, college === c && styles.optionTextActive]}>{c}</Text>
+                <Text style={distance === item ? styles.chipTextActive : styles.chipTextInactive}>
+                  {item}
+                </Text>
               </TouchableOpacity>
             ))}
           </View>
-        </ScrollView>
+        </View>
+
+        {/* Food */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Food</Text>
+          <View style={styles.chipsRow}>
+            {['Veg', 'Non-Veg', 'Both'].map(item => (
+              <TouchableOpacity
+                key={item}
+                style={[styles.chip, food === item ? styles.chipActive : styles.chipInactive, { paddingHorizontal: 24 }]}
+                onPress={() => setFood(item)}
+              >
+                <Text style={food === item ? styles.chipTextActive : styles.chipTextInactive}>
+                  {item}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+
+        {/* Hostel Type */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Hostel Type</Text>
+          <View style={styles.chipsRow}>
+            {['Any', 'Boys', 'Girls', 'Co-living'].map(item => (
+              <TouchableOpacity
+                key={item}
+                style={[styles.chip, gender === item ? styles.chipActive : styles.chipInactive]}
+                onPress={() => setGender(item)}
+              >
+                <Text style={gender === item ? styles.chipTextActive : styles.chipTextInactive}>
+                  {item}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+
+        {/* Sharing */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Sharing</Text>
+          <View style={styles.chipsRow}>
+            {['Any', 'Single', '2 Sharing', '3 Sharing', '4 Sharing', '5 Sharing'].map(item => (
+              <TouchableOpacity
+                key={item}
+                style={[styles.chip, sharing === item ? styles.chipActive : styles.chipInactive]}
+                onPress={() => setSharing(item)}
+              >
+                <Text style={sharing === item ? styles.chipTextActive : styles.chipTextInactive}>
+                  {item}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+
+        {/* Rating */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Rating</Text>
+          <View style={styles.chipsRow}>
+            {[{label: 'Any', val: 0}, {label: '4.5+', val: 4.5}, {label: '4.0+', val: 4.0}, {label: '3.5+', val: 3.5}].map(item => (
+              <TouchableOpacity
+                key={item.label}
+                style={[styles.chip, minRating === item.val ? styles.chipActive : styles.chipInactive]}
+                onPress={() => setMinRating(item.val)}
+              >
+                <Text style={minRating === item.val ? styles.chipTextActive : styles.chipTextInactive}>
+                  {item.label}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
 
         {/* Amenities */}
-        <Text style={styles.filterLabel}>Amenities Required</Text>
-        <View style={styles.amenityGrid}>
-          {AMENITIES_LIST.map(a => (
-            <TouchableOpacity
-              key={a}
-              style={[styles.amenityOption, selectedAmenities.includes(a) && styles.amenityOptionActive]}
-              onPress={() => handleAmenityToggle(a)}
-            >
-              <Text style={[styles.amenityOptionText, selectedAmenities.includes(a) && styles.amenityOptionTextActive]}>
-                {a}
-              </Text>
-            </TouchableOpacity>
-          ))}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Amenities</Text>
+          <View style={styles.amenitiesGrid}>
+            {amenitiesList.map((item, index) => {
+              const isSelected = selectedAmenities.includes(item.name);
+              return (
+                <TouchableOpacity
+                  key={index}
+                  style={styles.amenityItem}
+                  onPress={() => handleAmenityToggle(item.name)}
+                >
+                  <View style={[styles.amenityIconContainer, isSelected && styles.amenityIconContainerActive]}>
+                    <Ionicons 
+                      name={item.icon} 
+                      size={20} 
+                      color={isSelected ? '#ffffff' : '#6b7280'} 
+                    />
+                  </View>
+                  <Text style={[styles.amenityText, isSelected && styles.amenityTextActive]}>
+                    {item.name}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
         </View>
+
         <View style={{ height: 100 }} />
       </ScrollView>
 
       {/* Footer Action */}
       <View style={styles.footer}>
-        <TouchableOpacity style={styles.applyBtn} onPress={persistFiltersAndApply}>
+        <TouchableOpacity 
+          style={styles.applyBtn} 
+          onPress={applyFilters}
+        >
           <Text style={styles.applyBtnText}>Apply Filters</Text>
         </TouchableOpacity>
       </View>
@@ -203,57 +239,188 @@ export default function FilterScreen({ navigation, route }) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F9FAFB' },
+  container: { 
+    flex: 1, 
+    backgroundColor: '#ffffff' 
+  },
   header: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: 16, paddingVertical: 14,
-    borderBottomWidth: 1, borderBottomColor: '#f0f0f0',
-    backgroundColor: '#ffffff'
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    justifyContent: 'space-between',
+    paddingHorizontal: 20, 
+    paddingTop: 16,
+    paddingBottom: 16,
+    backgroundColor: '#ffffff',
   },
-  closeBtn: { padding: 4 },
-  closeBtnText: { fontSize: 20, color: '#1e1b29', fontWeight: 'bold' },
-  headerTitle: { fontSize: 18, fontWeight: 'bold', color: '#1e1b29' },
-  resetBtn: { fontSize: 14, color: '#ef4444', fontWeight: '600' },
-  scrollContent: { padding: 20 },
-  filterLabel: { fontSize: 15, fontWeight: 'bold', color: '#1e1b29', marginBottom: 12, marginTop: 24 },
-  filterOptions: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-  optionBtn: {
-    paddingVertical: 10, paddingHorizontal: 18,
-    borderRadius: 24, borderWidth: 1, borderColor: '#e2dff0', backgroundColor: '#ffffff'
+  headerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
-  optionBtnActive: { backgroundColor: '#4F46E5', borderColor: '#4F46E5' },
-  optionText: { fontSize: 14, color: '#5f5a75', fontWeight: '600' },
-  optionTextActive: { color: '#ffffff' },
-  budgetRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-  budgetBtn: {
-    paddingVertical: 10, paddingHorizontal: 16,
-    borderRadius: 24, borderWidth: 1, borderColor: '#e2dff0', backgroundColor: '#ffffff'
+  backBtn: { 
+    marginRight: 10 
   },
-  budgetBtnActive: { backgroundColor: '#4F46E5', borderColor: '#4F46E5' },
-  budgetText: { fontSize: 14, color: '#5f5a75', fontWeight: '600' },
-  budgetTextActive: { color: '#ffffff' },
-  toggleRow: {
-    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    backgroundColor: '#ffffff', borderRadius: 16, padding: 16,
-    borderWidth: 1, borderColor: '#e2dff0'
+  headerTitle: { 
+    fontSize: 20, 
+    fontWeight: 'bold', 
+    color: '#1f2937' 
   },
-  toggleRowActive: { borderColor: '#4F46E5', backgroundColor: '#f0ecfd' },
-  toggleText: { fontSize: 15, color: '#5f5a75', fontWeight: '600' },
-  toggleTextActive: { color: '#4F46E5' },
-  toggle: { width: 50, height: 28, borderRadius: 14, backgroundColor: '#e5e0f8', padding: 2, justifyContent: 'center', alignItems: 'flex-start' },
-  toggleOn: { backgroundColor: '#4F46E5', alignItems: 'flex-end' },
-  toggleThumb: { width: 24, height: 24, borderRadius: 12, backgroundColor: '#ffffff', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.2, shadowRadius: 2, elevation: 2 },
-  amenityGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-  amenityOption: { paddingVertical: 10, paddingHorizontal: 14, borderRadius: 24, borderWidth: 1, borderColor: '#e2dff0', backgroundColor: '#ffffff' },
-  amenityOptionActive: { backgroundColor: '#4F46E5', borderColor: '#4F46E5' },
-  amenityOptionText: { fontSize: 13, color: '#5f5a75', fontWeight: '600' },
-  amenityOptionTextActive: { color: '#ffffff' },
+  resetBtnText: { 
+    fontSize: 16, 
+    color: '#4F46E5', 
+    fontWeight: '600' 
+  },
+  scrollContent: { 
+    paddingHorizontal: 20,
+    paddingTop: 10,
+  },
+  section: {
+    marginBottom: 28,
+  },
+  sectionTitle: { 
+    fontSize: 16, 
+    fontWeight: 'bold', 
+    color: '#1f2937', 
+    marginBottom: 16 
+  },
+  
+  // Slider Styles
+  sliderContainer: {
+    height: 30,
+    justifyContent: 'center',
+    position: 'relative',
+    marginHorizontal: 10,
+    marginTop: 10,
+  },
+  sliderTrackBackground: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    height: 3,
+    backgroundColor: '#e5e7eb',
+    top: '50%',
+    marginTop: -1.5,
+  },
+  sliderTrackActive: {
+    position: 'absolute',
+    height: 3,
+    backgroundColor: '#4F46E5',
+    top: '50%',
+    marginTop: -1.5,
+  },
+  sliderDot: {
+    position: 'absolute',
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#4F46E5',
+    top: '50%',
+    marginTop: -3,
+    marginLeft: -3,
+  },
+  sliderThumb: {
+    position: 'absolute',
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: '#4F46E5',
+    top: '50%',
+    marginTop: -8,
+    marginLeft: -8,
+  },
+  priceLabelsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 8,
+  },
+  priceLabel: {
+    fontSize: 12,
+    color: '#8b5cf6',
+    fontWeight: '700',
+  },
+  
+  // Chips
+  chipsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 12,
+  },
+  chip: {
+    paddingVertical: 10,
+    paddingHorizontal: 18,
+    borderRadius: 12,
+  },
+  chipActive: { 
+    backgroundColor: '#4F46E5',
+  },
+  chipInactive: { 
+    backgroundColor: '#f3f4f6',
+  },
+  chipTextActive: { 
+    color: '#ffffff', 
+    fontSize: 14, 
+    fontWeight: '600' 
+  },
+  chipTextInactive: { 
+    color: '#4b5563', 
+    fontSize: 14, 
+    fontWeight: '500' 
+  },
+
+  // Amenities Grid
+  amenitiesGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    rowGap: 24,
+  },
+  amenityItem: {
+    width: '23%',
+    alignItems: 'center',
+  },
+  amenityIconContainer: {
+    width: 50,
+    height: 50,
+    borderRadius: 16,
+    backgroundColor: '#f3f4f6',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 8,
+  },
+  amenityIconContainerActive: {
+    backgroundColor: '#4F46E5',
+  },
+  amenityText: {
+    fontSize: 11,
+    color: '#4b5563',
+    textAlign: 'center',
+    fontWeight: '500',
+  },
+  amenityTextActive: {
+    color: '#4F46E5',
+    fontWeight: '700',
+  },
+
+  // Footer
   footer: {
-    position: 'absolute', bottom: 0, left: 0, right: 0,
-    backgroundColor: '#ffffff', padding: 16,
-    borderTopWidth: 1, borderTopColor: '#f0f0f0',
-    shadowColor: '#000', shadowOffset: { width: 0, height: -4 }, shadowOpacity: 0.05, shadowRadius: 8, elevation: 10
+    position: 'absolute', 
+    bottom: 0, 
+    left: 0, 
+    right: 0,
+    backgroundColor: '#ffffff', 
+    padding: 20,
+    borderTopWidth: 1, 
+    borderTopColor: '#f3f4f6',
   },
-  applyBtn: { backgroundColor: '#4F46E5', borderRadius: 12, paddingVertical: 16, alignItems: 'center' },
-  applyBtnText: { color: '#ffffff', fontSize: 16, fontWeight: 'bold' }
+  applyBtn: { 
+    backgroundColor: '#4F46E5', 
+    borderRadius: 16, 
+    paddingVertical: 18, 
+    alignItems: 'center' 
+  },
+  applyBtnText: { 
+    color: '#ffffff', 
+    fontSize: 16, 
+    fontWeight: 'bold' 
+  }
 });

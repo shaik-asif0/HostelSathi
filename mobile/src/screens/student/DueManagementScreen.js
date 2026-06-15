@@ -3,111 +3,41 @@ import {
   View, Text, StyleSheet, SafeAreaView, ScrollView,
   TouchableOpacity, ActivityIndicator, Alert
 } from 'react-native';
-import { useSelector } from 'react-redux';
-import RazorpayCheckout from 'react-native-razorpay';
-import apiClient from '../../api/apiClient';
+import { useSelector, useDispatch } from 'react-redux';
+import { payDue } from '../../redux/bookingsSlice';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 
 export default function DueManagementScreen({ navigation }) {
-  const { user, token } = useSelector(state => state.auth);
-  const [loading, setLoading] = useState(true);
-  const [tenantInfo, setTenantInfo] = useState(null);
+  const { user } = useSelector(state => state.auth);
+  const { dues } = useSelector(state => state.bookings);
+  const dispatch = useDispatch();
+  const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
-    fetchTenantInfo();
-  }, []);
+  // For simplicity, grab the first due if it exists
+  const activeDue = dues.length > 0 ? dues[0] : null;
 
-  const fetchTenantInfo = async () => {
-    try {
-      const res = await apiClient.get(`/tenants/me`);
-      if (res.data.success) {
-        setTenantInfo(res.data.tenant);
-      }
-    } catch (err) {
-      console.error(err);
-      // It's possible the user is not a tenant yet
-    } finally {
+  const handlePayNow = () => {
+    if (!activeDue) return;
+    
+    setLoading(true);
+    // Simulate payment delay
+    setTimeout(() => {
+      dispatch(payDue(activeDue._id));
       setLoading(false);
-    }
+      Alert.alert('Payment Successful! 🎉', `You have successfully paid ₹${activeDue.amount} for ${activeDue.month}.`);
+      navigation.navigate('MyReceipts');
+    }, 1500);
   };
 
-  const handlePayNow = async () => {
-    if (!tenantInfo || tenantInfo.pendingAmount <= 0) return;
-
-    try {
-      setLoading(true);
-      // 1. Create order on backend
-      const { data } = await apiClient.post(`/payments/create-order`, {
-        amount: tenantInfo.pendingAmount,
-        type: 'rent',
-        tenantId: tenantInfo._id,
-        hostelId: tenantInfo.hostel
-      });
-
-      if (!data.success) {
-        throw new Error(data.error || 'Failed to create order');
-      }
-
-      // 2. Open Razorpay Checkout
-      const options = {
-        description: 'Monthly Rent Payment',
-        image: 'https://hostelsathi.com/logo.png', // Optional
-        currency: data.currency,
-        key: process.env.RAZORPAY_KEY_ID || 'rzp_test_placeholder',
-        amount: data.amount,
-        name: 'HostelSathi',
-        order_id: data.orderId,
-        prefill: {
-          email: user.email,
-          contact: user.phone,
-          name: user.name
-        },
-        theme: { color: '#4F46E5' }
-      };
-
-      RazorpayCheckout.open(options).then(async (paymentData) => {
-        // 3. Verify Payment
-        const verifyRes = await apiClient.post(`/payments/verify`, {
-          razorpay_order_id: paymentData.razorpay_order_id,
-          razorpay_payment_id: paymentData.razorpay_payment_id,
-          razorpay_signature: paymentData.razorpay_signature,
-          payment_record_id: data.paymentId
-        });
-
-        if (verifyRes.data.success) {
-          Alert.alert('Success', 'Rent payment successful!');
-          fetchTenantInfo();
-          // Optionally navigate to Receipt
-        }
-      }).catch((error) => {
-        console.log(error);
-        Alert.alert('Payment Cancelled', 'You cancelled the payment or it failed.');
-      });
-    } catch (err) {
-      console.error('Payment Error:', err);
-      Alert.alert('Error', 'Could not initiate payment.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  if (loading) {
-    return (
-      <View style={styles.center}>
-        <ActivityIndicator size="large" color="#4F46E5" />
-      </View>
-    );
-  }
-
-  if (!tenantInfo) {
+  if (!activeDue) {
     return (
       <SafeAreaView style={styles.safe}>
         <View style={styles.center}>
-          <Ionicons name="home-outline" size={60} color="#8b85a3" style={{ marginBottom: 16 }} />
-          <Text style={styles.title}>No Active Tenancy</Text>
-          <Text style={styles.subtitle}>You haven't joined a hostel yet.</Text>
-          <TouchableOpacity style={styles.btn} onPress={() => navigation.navigate('StudentTabs')}>
-            <Text style={styles.btnText}>Explore Hostels</Text>
+          <Ionicons name="checkmark-circle" size={60} color="#10b981" style={{ marginBottom: 16 }} />
+          <Text style={styles.title}>All Caught Up!</Text>
+          <Text style={styles.subtitle}>You have no pending dues.</Text>
+          <TouchableOpacity style={styles.btn} onPress={() => navigation.navigate('MyReceipts')}>
+            <Text style={styles.btnText}>View Receipts</Text>
           </TouchableOpacity>
         </View>
       </SafeAreaView>
@@ -118,42 +48,32 @@ export default function DueManagementScreen({ navigation }) {
     <SafeAreaView style={styles.safe}>
       <ScrollView contentContainerStyle={styles.container}>
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>Current Dues</Text>
+          <Text style={styles.cardTitle}>Current Dues for {activeDue.month}</Text>
           <View style={styles.row}>
-            <Text style={styles.label}>Monthly Rent:</Text>
-            <Text style={styles.value}>₹{tenantInfo.rentAmount}</Text>
+            <Text style={styles.label}>Hostel:</Text>
+            <Text style={styles.value}>{activeDue.hostelName}</Text>
           </View>
           <View style={styles.row}>
-            <Text style={styles.label}>Paid Amount:</Text>
-            <Text style={[styles.value, { color: '#10b981' }]}>₹{tenantInfo.paidAmount || 0}</Text>
+            <Text style={styles.label}>Monthly Rent:</Text>
+            <Text style={styles.value}>₹{activeDue.amount}</Text>
           </View>
           <View style={styles.divider} />
           <View style={styles.row}>
             <Text style={styles.label}>Pending Amount:</Text>
             <Text style={[styles.value, { color: '#ef4444', fontWeight: 'bold' }]}>
-              ₹{tenantInfo.pendingAmount}
+              ₹{activeDue.amount}
             </Text>
-          </View>
-          <View style={styles.row}>
-            <Text style={styles.label}>Late Fee:</Text>
-            <Text style={styles.value}>₹{tenantInfo.lateFee || 0}</Text>
           </View>
           <View style={styles.row}>
             <Text style={styles.label}>Due Date:</Text>
             <Text style={styles.value}>
-              {tenantInfo.dueDate ? new Date(tenantInfo.dueDate).toLocaleDateString() : 'N/A'}
+              {new Date(activeDue.dueDate).toLocaleDateString()}
             </Text>
           </View>
 
-          {tenantInfo.pendingAmount > 0 ? (
-            <TouchableOpacity style={styles.payBtn} onPress={handlePayNow} disabled={loading}>
-              <Text style={styles.payBtnText}>Pay ₹{tenantInfo.pendingAmount + (tenantInfo.lateFee || 0)}</Text>
-            </TouchableOpacity>
-          ) : (
-            <View style={styles.paidBadge}>
-              <Text style={styles.paidBadgeText}>✓ All Dues Cleared</Text>
-            </View>
-          )}
+          <TouchableOpacity style={styles.payBtn} onPress={handlePayNow} disabled={loading}>
+            {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.payBtnText}>Pay ₹{activeDue.amount}</Text>}
+          </TouchableOpacity>
         </View>
       </ScrollView>
     </SafeAreaView>

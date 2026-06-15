@@ -8,34 +8,16 @@ import apiClient from '../../api/apiClient';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 
 export default function MyReceiptsScreen({ navigation }) {
-  const { token } = useSelector(state => state.auth);
-  const [payments, setPayments] = useState([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    fetchPayments();
-  }, []);
-
-  const fetchPayments = async () => {
-    try {
-      const res = await apiClient.get(`/payments/me`);
-      if (res.data.success) {
-        setPayments(res.data.payments);
-      }
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const { receipts } = useSelector(state => state.bookings);
+  const loading = false;
 
   const renderReceiptCard = ({ item }) => (
     <View style={styles.card}>
       <View style={styles.cardHeader}>
         <Text style={styles.typeBadge}>
-          {item.type === 'rent' ? 'Rent Payment' : item.type === 'deposit' ? 'Deposit' : 'Other'}
+          Rent Payment
         </Text>
-        <Text style={styles.date}>{new Date(item.createdAt).toLocaleDateString()}</Text>
+        <Text style={styles.date}>{item.paidOn}</Text>
       </View>
       <View style={styles.row}>
         <Text style={styles.label}>Amount Paid:</Text>
@@ -43,11 +25,11 @@ export default function MyReceiptsScreen({ navigation }) {
       </View>
       <View style={styles.row}>
         <Text style={styles.label}>Transaction ID:</Text>
-        <Text style={styles.value}>{item.razorpayPaymentId}</Text>
+        <Text style={styles.value}>{item.transactionId}</Text>
       </View>
       <View style={styles.row}>
         <Text style={styles.label}>Hostel:</Text>
-        <Text style={styles.value}>{item.hostel?.name || 'Unknown'}</Text>
+        <Text style={styles.value}>{item.hostelName}</Text>
       </View>
 
       {/* In a real app, this button could open a PDF generator or a detailed view */}
@@ -68,7 +50,7 @@ export default function MyReceiptsScreen({ navigation }) {
 
   return (
     <SafeAreaView style={styles.safe}>
-      {payments.length === 0 ? (
+      {receipts.length === 0 ? (
         <View style={styles.center}>
           <Ionicons name="document-text-outline" size={60} color="#8b85a3" style={{ marginBottom: 16 }} />
           <Text style={styles.title}>No Receipts Yet</Text>
@@ -76,7 +58,7 @@ export default function MyReceiptsScreen({ navigation }) {
         </View>
       ) : (
         <FlatList
-          data={payments}
+          data={receipts}
           keyExtractor={(item) => item._id}
           renderItem={renderReceiptCard}
           contentContainerStyle={styles.list}

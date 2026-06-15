@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TextInput, TouchableOpacity, ScrollView, SafeAreaView, ActivityIndicator, Alert, Switch, Image } from 'react-native';
-import { useSelector } from 'react-redux';
+import { useSelector, useDispatch } from 'react-redux';
 import { launchImageLibrary } from 'react-native-image-picker';
-import { hostelsAPI, uploadAPI } from '../../api/apiClient';
+import { addHostel } from '../../redux/hostelSlice';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 
 // Real Hyderabad colleges for selection
@@ -18,6 +18,7 @@ export default function AddHostelScreen({ route, navigation }) {
   const isEditMode = !!editHostel;
 
   const { token } = useSelector(state => state.auth);
+  const dispatch = useDispatch();
 
   // Form states
   const [name, setName] = useState('');
@@ -154,90 +155,33 @@ export default function AddHostelScreen({ route, navigation }) {
 
     setLoading(true);
 
-    let finalPhotos = [...existingPhotos];
-    let finalFoodPhotos = [...existingFoodPhotos];
-
     try {
-      // 1. Upload Local Property Photos
-      if (localPhotos.length > 0) {
-        const formData = new FormData();
-        localPhotos.forEach(photo => {
-          formData.append('photos', {
-            uri: photo.uri,
-            type: photo.type || 'image/jpeg',
-            name: photo.fileName || `photo-${Date.now()}.jpg`
-          });
-        });
-        const uploadRes = await uploadAPI.uploadFiles(formData);
-        if (uploadRes.data.success) {
-          finalPhotos = [...finalPhotos, ...uploadRes.data.data];
-        }
-      }
-
-      // 2. Upload Local Food Photos
-      if (localFoodPhotos.length > 0) {
-        const formData = new FormData();
-        localFoodPhotos.forEach(photo => {
-          formData.append('photos', {
-            uri: photo.uri,
-            type: photo.type || 'image/jpeg',
-            name: photo.fileName || `food-${Date.now()}.jpg`
-          });
-        });
-        const uploadRes = await uploadAPI.uploadFiles(formData);
-        if (uploadRes.data.success) {
-          finalFoodPhotos = [...finalFoodPhotos, ...uploadRes.data.data];
-        }
-      }
-
       const payload = {
         name: name.trim(),
         address: address.trim(),
-        lng: parseFloat(lng),
-        lat: parseFloat(lat),
+        rent: {
+          single: parseInt(rentSingle) || 0,
+          sharing2: parseInt(rentSharing2) || 0,
+          sharing3: parseInt(rentSharing3) || 0,
+        },
         nearbyColleges: selectedColleges,
-        rentSingle: parseInt(rentSingle) || 0,
-        rentSharing2: parseInt(rentSharing2) || 0,
-        rentSharing3: parseInt(rentSharing3) || 0,
-        rentSharing4: parseInt(rentSharing4) || 0,
-        rentSharing5: parseInt(rentSharing5) || 0,
         foodIncluded,
         foodType: foodIncluded ? foodType : 'none',
         amenities: selectedAmenities,
-        photos: finalPhotos,
-        foodPhotos: finalFoodPhotos,
         gender,
         isPremium,
-        singleVacancy: parseInt(singleVacancy) || 0,
-        sharing2Vacancy: parseInt(sharing2Vacancy) || 0,
-        sharing3Vacancy: parseInt(sharing3Vacancy) || 0,
-        sharing4Vacancy: parseInt(sharing4Vacancy) || 0,
-        sharing5Vacancy: parseInt(sharing5Vacancy) || 0,
-        fees: {
-          depositAmount: parseInt(depositAmount) || 0,
-          maintenanceFee: parseInt(maintenanceFee) || 0,
-          noticePeriodDays: parseInt(noticePeriodDays) || 0
-        },
-        rules: {
-          curfewTime: curfewTime.trim() || 'No curfew',
-          visitorsAllowed,
-          smokingAllowed,
-          drinkingAllowed
-        }
       };
 
-      const res = isEditMode
-        ? await hostelsAPI.update(editHostel._id, payload)
-        : await hostelsAPI.create(payload);
-
-      if (res.data.success) {
+      // Simulate network request
+      setTimeout(() => {
+        dispatch(addHostel(payload));
+        setLoading(false);
         Alert.alert('Success', isEditMode ? 'Hostel listing updated!' : 'New hostel listing created!');
         navigation.goBack();
-      }
+      }, 1000);
+      
     } catch (err) {
-      const msg = err.response?.data?.error || err.friendlyMessage || 'Failed to save hostel. Try again.';
-      Alert.alert('Error', msg);
-    } finally {
+      Alert.alert('Error', 'Failed to save hostel. Try again.');
       setLoading(false);
     }
   };

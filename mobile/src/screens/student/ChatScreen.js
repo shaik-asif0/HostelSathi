@@ -1,101 +1,48 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState } from 'react';
 import {
   View, Text, StyleSheet, FlatList, TextInput, TouchableOpacity,
-  KeyboardAvoidingView, Platform, SafeAreaView, ActivityIndicator
+  KeyboardAvoidingView, Platform, SafeAreaView, Image, StatusBar
 } from 'react-native';
-import { useSelector } from 'react-redux';
-import apiClient from '../../api/apiClient';
-import { initSocket } from '../../utils/socket';
+import { useSelector, useDispatch } from 'react-redux';
+import { appendMessage } from '../../redux/chatSlice';
+import Ionicons from 'react-native-vector-icons/Ionicons';
 
 export default function ChatScreen({ route, navigation }) {
-  // Params passed from navigation
-  const { hostelId, hostelName, ownerId, ownerName } = route.params;
-  const { user } = useSelector(state => state.auth);
-
-  const [messages, setMessages] = useState([]);
+  const { hostelId, hostelName, ownerName } = route.params || {};
   const [inputText, setInputText] = useState('');
-  const [loading, setLoading] = useState(true);
+  const { conversations } = useSelector(state => state.chat);
+  const { user } = useSelector(state => state.auth);
+  const dispatch = useDispatch();
 
-  const flatListRef = useRef();
+  const currentMessages = conversations[hostelId] || [];
 
-  useEffect(() => {
-    // Set dynamic header title
-    navigation.setOptions({ title: ownerName || 'Chat' });
+  const handleSend = () => {
+    if (!inputText.trim() || !hostelId) return;
 
-    fetchMessages();
-
-    const userId = user._id || user.id;
-    const socket = initSocket(userId);
-    socket.emit('join_chat', { hostelId, userId });
-
-    // Listeners
-    socket.on('receive_message', handleIncomingMessage);
-    socket.on('message_sent', handleIncomingMessage); // Local echo from server
-
-    return () => {
-      socket.off('receive_message', handleIncomingMessage);
-      socket.off('message_sent', handleIncomingMessage);
+    const newMsg = {
+      _id: Date.now().toString(),
+      sender: user._id || 'student', // 'me' maps to current user
+      type: 'text',
+      content: inputText.trim(),
+      createdAt: new Date().toISOString()
     };
-  }, []);
 
-  const handleIncomingMessage = (msg) => {
-    // Only accept messages for this chat
-    if (msg.hostel === hostelId) {
-      setMessages(prev => {
-        // Prevent duplicates
-        if (prev.find(m => m._id === msg._id)) return prev;
-        return [...prev, msg];
-      });
-      // Scroll to bottom
-      setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
-    }
-  };
-
-  const fetchMessages = async () => {
-    try {
-      const isOwner = user.role === 'owner';
-      const studentId = isOwner ? ownerId : undefined;
-      // If owner, the ownerId passed is actually the student's ID!
-
-      const endpoint = studentId
-        ? `/messages/${hostelId}/${studentId}`
-        : `/messages/${hostelId}`;
-
-      const res = await apiClient.get(endpoint);
-      if (res.data.success) {
-        setMessages(res.data.messages || []);
-        setTimeout(() => flatListRef.current?.scrollToEnd({ animated: false }), 100);
-      }
-    } catch (err) {
-      console.error('Fetch messages error:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const sendMessage = async () => {
-    if (!inputText.trim()) return;
-    const content = inputText.trim();
+    dispatch(appendMessage({ hostelId, message: newMsg }));
     setInputText('');
-
-    // Send via REST API (which triggers the socket emission internally, or we can emit directly)
-    try {
-      const res = await apiClient.post('/messages', {
-        hostelId,
-        receiverId: ownerId,
-        content
-      });
-      if (res.data.success) {
-        // We could manually append, but the server will emit 'message_sent' / 'receive_message'
-        handleIncomingMessage(res.data.message);
-      }
-    } catch (err) {
-      console.error('Send message error:', err);
-    }
   };
 
   const renderMessage = ({ item }) => {
-    const isMe = item.sender === (user._id || user.id);
+    // If the sender matches the current logged in user, it's 'me'
+    const isMe = item.sender === (user._id || 'student');
+    
+    if (item.type === 'image') {
+      return (
+        <View style={[styles.msgWrapper, isMe ? styles.msgWrapperRight : styles.msgWrapperLeft]}>
+          <Image source={{ uri: item.content }} style={styles.msgImage} />
+        </View>
+      );
+    }
+
     return (
       <View style={[styles.msgWrapper, isMe ? styles.msgWrapperRight : styles.msgWrapperLeft]}>
         <View style={[styles.msgBubble, isMe ? styles.msgBubbleRight : styles.msgBubbleLeft]}>
@@ -103,89 +50,209 @@ export default function ChatScreen({ route, navigation }) {
             {item.content}
           </Text>
         </View>
-        <Text style={styles.timeText}>
-          {new Date(item.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-        </Text>
       </View>
     );
   };
 
   return (
     <SafeAreaView style={styles.safe}>
-      {loading ? (
-        <View style={styles.centerBox}>
-          <ActivityIndicator size="large" color="#4F46E5" />
-        </View>
-      ) : (
-        <KeyboardAvoidingView
-          style={styles.container}
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-          keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
-        >
-          <View style={styles.hostelBanner}>
-            <Text style={styles.hostelBannerText}>🏠 {hostelName}</Text>
-          </View>
-
-          <FlatList
-            ref={flatListRef}
-            data={messages}
-            keyExtractor={item => item._id}
-            renderItem={renderMessage}
-            contentContainerStyle={styles.listContainer}
-            onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: true })}
+      <StatusBar barStyle="dark-content" backgroundColor="#ffffff" />
+      
+      {/* Custom Header */}
+      <View style={styles.header}>
+        <View style={styles.headerLeft}>
+          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
+            <Ionicons name="arrow-back" size={24} color="#4b5563" />
+          </TouchableOpacity>
+          <Image 
+            source={{ uri: 'https://randomuser.me/api/portraits/men/32.jpg' }} 
+            style={styles.avatar} 
           />
+          <View style={styles.headerTitleBox}>
+            <Text style={styles.headerTitle}>{hostelName || ownerName || 'Chat'}</Text>
+            <Text style={styles.headerSubtitle}>Online</Text>
+          </View>
+        </View>
+        <View style={styles.headerRight}>
+          <TouchableOpacity style={styles.iconBtn}>
+            <Ionicons name="call-outline" size={22} color="#4b5563" />
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.iconBtn}>
+            <Ionicons name="ellipsis-vertical" size={22} color="#4b5563" />
+          </TouchableOpacity>
+        </View>
+      </View>
 
-          <View style={styles.inputBox}>
+      <KeyboardAvoidingView
+        style={styles.container}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      >
+        <FlatList
+          data={currentMessages}
+          keyExtractor={item => item._id}
+          renderItem={renderMessage}
+          contentContainerStyle={styles.listContainer}
+          showsVerticalScrollIndicator={false}
+        />
+
+        {/* Input Box */}
+        <View style={styles.inputContainer}>
+          <View style={styles.inputWrapper}>
             <TextInput
               style={styles.input}
               placeholder="Type a message..."
+              placeholderTextColor="#9ca3af"
               value={inputText}
               onChangeText={setInputText}
               multiline
             />
-            <TouchableOpacity
-              style={[styles.sendBtn, !inputText.trim() && { opacity: 0.5 }]}
-              onPress={sendMessage}
-              disabled={!inputText.trim()}
-            >
-              <Text style={styles.sendIcon}>➤</Text>
+            <TouchableOpacity style={styles.sendBtn} onPress={handleSend}>
+              <Ionicons name="send" size={16} color="#ffffff" style={{ marginLeft: 2 }} />
             </TouchableOpacity>
           </View>
-        </KeyboardAvoidingView>
-      )}
+        </View>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#F9FAFB' },
-  container: { flex: 1 },
-  hostelBanner: { backgroundColor: '#EEF2FF', paddingVertical: 6, alignItems: 'center' },
-  hostelBannerText: { fontSize: 12, color: '#312E81', fontWeight: 'bold' },
-  listContainer: { padding: 16, flexGrow: 1, justifyContent: 'flex-end' },
-  msgWrapper: { marginBottom: 16, maxWidth: '80%' },
-  msgWrapperLeft: { alignSelf: 'flex-start' },
-  msgWrapperRight: { alignSelf: 'flex-end', alignItems: 'flex-end' },
-  msgBubble: { paddingHorizontal: 16, paddingVertical: 10, borderRadius: 20 },
-  msgBubbleLeft: { backgroundColor: '#fff', borderBottomLeftRadius: 4, borderWidth: 1, borderColor: '#f1f1f1' },
-  msgBubbleRight: { backgroundColor: '#4F46E5', borderBottomRightRadius: 4 },
-  msgText: { fontSize: 15, lineHeight: 20 },
-  msgTextLeft: { color: '#1e1b29' },
-  msgTextRight: { color: '#fff' },
-  timeText: { fontSize: 10, color: '#a09abc', marginTop: 4, marginHorizontal: 4 },
-  inputBox: {
-    flexDirection: 'row', padding: 12, backgroundColor: '#fff',
-    borderTopWidth: 1, borderTopColor: '#f1f1f1', alignItems: 'center'
+  safe: { 
+    flex: 1, 
+    backgroundColor: '#ffffff' 
+  },
+  container: { 
+    flex: 1 
+  },
+  
+  // Header
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f3f4f6',
+    backgroundColor: '#ffffff',
+  },
+  headerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  backBtn: {
+    marginRight: 12,
+  },
+  avatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    marginRight: 12,
+  },
+  headerTitleBox: {
+    justifyContent: 'center',
+  },
+  headerTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#1f2937',
+  },
+  headerSubtitle: {
+    fontSize: 12,
+    color: '#10b981',
+    fontWeight: '500',
+    marginTop: 2,
+  },
+  headerRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
+  },
+  iconBtn: {
+    padding: 4,
+  },
+
+  // List
+  listContainer: { 
+    padding: 16, 
+    paddingTop: 24,
+    gap: 16,
+  },
+  msgWrapper: { 
+    maxWidth: '75%',
+  },
+  msgWrapperLeft: { 
+    alignSelf: 'flex-start' 
+  },
+  msgWrapperRight: { 
+    alignSelf: 'flex-end', 
+  },
+  msgBubble: { 
+    paddingHorizontal: 16, 
+    paddingVertical: 12, 
+  },
+  msgBubbleLeft: { 
+    backgroundColor: '#f5f3ff', 
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
+    borderBottomRightRadius: 16,
+    borderBottomLeftRadius: 4,
+  },
+  msgBubbleRight: { 
+    backgroundColor: '#5b21b6', 
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
+    borderBottomLeftRadius: 16,
+    borderBottomRightRadius: 4,
+  },
+  msgText: { 
+    fontSize: 15, 
+    lineHeight: 22,
+    fontWeight: '400',
+  },
+  msgTextLeft: { 
+    color: '#374151' 
+  },
+  msgTextRight: { 
+    color: '#ffffff' 
+  },
+  msgImage: {
+    width: 260,
+    height: 160,
+    borderRadius: 12,
+    borderBottomLeftRadius: 4,
+  },
+
+  // Input
+  inputContainer: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: '#ffffff',
+  },
+  inputWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#ffffff',
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+    borderRadius: 24,
+    paddingHorizontal: 16,
+    paddingVertical: 6,
   },
   input: {
-    flex: 1, backgroundColor: '#ffffff', borderRadius: 20,
-    paddingHorizontal: 16, paddingVertical: 10, fontSize: 15,
-    maxHeight: 100, color: '#1e1b29'
+    flex: 1,
+    fontSize: 15,
+    color: '#1f2937',
+    maxHeight: 100,
+    minHeight: 40,
   },
   sendBtn: {
-    width: 44, height: 44, borderRadius: 22, backgroundColor: '#4F46E5',
-    alignItems: 'center', justifyContent: 'center', marginLeft: 10
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#5b21b6',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: 12,
   },
-  sendIcon: { color: '#fff', fontSize: 18, fontWeight: 'bold', marginLeft: 2 },
-  centerBox: { flex: 1, justifyContent: 'center', alignItems: 'center' }
 });

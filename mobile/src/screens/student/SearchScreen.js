@@ -1,64 +1,39 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
   View, Text, StyleSheet, FlatList, TextInput, TouchableOpacity,
-  SafeAreaView, ActivityIndicator, Image
+  SafeAreaView, ActivityIndicator, Image, StatusBar, ScrollView
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { hostelsAPI } from '../../api/apiClient';
+import Ionicons from 'react-native-vector-icons/Ionicons';
+import { useSelector } from 'react-redux';
 
-const STORAGE_KEYS = { HISTORY: 'hs_search_history' };
-const MAX_HISTORY = 8;
+// Hardcoded MOCK_RESULTS removed. We now use Redux store mock data.
 
-export default function SearchScreen({ navigation }) {
+export default function SearchScreen({ navigation, route }) {
+  const { hostels: reduxHostels } = useSelector((state) => state.hostels);
   const [hostels, setHostels] = useState([]);
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState('');
-  const [searchHistory, setSearchHistory] = useState([]);
-  const inputRef = useRef(null);
+  const [advancedFilters, setAdvancedFilters] = useState(null);
 
   useEffect(() => {
-    loadHistory();
-    // Auto focus search bar
-    setTimeout(() => {
-      inputRef.current?.focus();
-    }, 100);
-  }, []);
+    AsyncStorage.getItem('hs_persisted_filters').then(res => {
+      if (res) setAdvancedFilters(JSON.parse(res));
+      else setAdvancedFilters(null);
+    });
+  }, [route?.params?.filtersUpdated]);
 
   useEffect(() => {
     const debounce = setTimeout(() => {
       if (search.trim().length > 0) {
         fetchHostels();
       } else {
-        setHostels([]); // Clear results if search is empty
+        setHostels([]); 
       }
     }, 300);
     return () => clearTimeout(debounce);
   }, [search]);
-
-  const loadHistory = async () => {
-    try {
-      const historyJson = await AsyncStorage.getItem(STORAGE_KEYS.HISTORY);
-      if (historyJson) setSearchHistory(JSON.parse(historyJson));
-    } catch (err) {
-      console.error(err);
-    }
-  };
-
-  const addToHistory = async (term) => {
-    if (!term.trim()) return;
-    try {
-      const updated = [term, ...searchHistory.filter(h => h !== term)].slice(0, MAX_HISTORY);
-      setSearchHistory(updated);
-      await AsyncStorage.setItem(STORAGE_KEYS.HISTORY, JSON.stringify(updated));
-    } catch (err) {
-      console.error(err);
-    }
-  };
-
-  const clearHistory = async () => {
-    setSearchHistory([]);
-    await AsyncStorage.removeItem(STORAGE_KEYS.HISTORY);
-  };
 
   const fetchHostels = async () => {
     setLoading(true);
@@ -74,37 +49,92 @@ export default function SearchScreen({ navigation }) {
     }
   };
 
-  const handleSearchSubmit = () => {
-    addToHistory(search);
-    fetchHostels();
-  };
+  // Combine search and advanced filters
+  const displayResults = reduxHostels.filter(h => {
+    // 1. Search text
+    if (search.trim() && !h.name.toLowerCase().includes(search.toLowerCase()) && !(h.address && h.address.toLowerCase().includes(search.toLowerCase()))) {
+      return false;
+    }
 
-  const getMinRent = (h) => {
-    const prices = [h.rent?.single, h.rent?.sharing2, h.rent?.sharing3].filter(p => p > 0);
-    return prices.length > 0 ? Math.min(...prices) : 999999;
-  };
+    // 3. Advanced Filters
+    if (advancedFilters) {
+      const minRent = h.rent?.single || h.rent?.sharing2 || 999999;
+      if (advancedFilters.maxRent && minRent > advancedFilters.maxRent) return false;
+      if (advancedFilters.food && advancedFilters.food !== 'Both') {
+        // Mock food logic
+        if (advancedFilters.food === 'Veg' && !h.foodIncluded) return false;
+      }
+      // Mock sharing logic
+      if (advancedFilters.sharing && advancedFilters.sharing !== 'Any') {
+        if (advancedFilters.sharing === 'Single' && !h.rent?.single) return false;
+        if (advancedFilters.sharing === '2 Sharing' && !h.rent?.sharing2) return false;
+        if (advancedFilters.sharing === '3 Sharing' && !h.rent?.sharing3) return false;
+      }
+      // Mock amenities logic
+      if (advancedFilters.selectedAmenities && advancedFilters.selectedAmenities.length > 0) {
+        if (!h.amenities) return false;
+        for (let am of advancedFilters.selectedAmenities) {
+          if (!h.amenities.includes(am)) return false;
+        }
+      }
+      
+      // Gender logic
+      if (advancedFilters.gender && advancedFilters.gender !== 'Any') {
+        if (advancedFilters.gender === 'Boys' && h.gender !== 'boys') return false;
+        if (advancedFilters.gender === 'Girls' && h.gender !== 'girls') return false;
+        if (advancedFilters.gender === 'Co-living' && h.gender !== 'coliving' && h.gender !== 'both') return false;
+      }
+
+      // Rating logic
+      if (advancedFilters.minRating) {
+        if ((h.rating || 0) < advancedFilters.minRating) return false;
+      }
+    }
+
+    return true;
+  });
 
   const renderHostelCard = ({ item }) => {
-    const minRent = getMinRent(item);
+    const minRent = item.rent?.single || 0;
     return (
       <TouchableOpacity
         style={styles.card}
-        onPress={() => {
-          addToHistory(search);
-          navigation.navigate('HostelDetail', { hostelId: item._id });
-        }}
+        activeOpacity={0.9}
+        onPress={() => navigation.navigate('HostelDetail', { hostelId: item._id })}
       >
         <Image
-          source={{ uri: (item.photos && item.photos.length > 0) ? item.photos[0] : 'https://images.unsplash.com/photo-1555854877-bab0e564b8d5?auto=format&fit=crop&w=150&q=80' }}
-          style={styles.cardImg}
+          source={{ uri: (item.photos && item.photos.length > 0) ? item.photos[0] : 'https://images.unsplash.com/photo-1555854877-bab0e564b8d5?auto=format&fit=crop&w=500&q=80' }}
+          style={styles.image}
         />
+        {item.isPremium && <View style={styles.premiumBadge}><Text style={styles.premiumText}>PREMIUM</Text></View>}
+
         <View style={styles.cardInfo}>
           <Text style={styles.cardTitle} numberOfLines={1}>{item.name}</Text>
-          <Text style={styles.cardAddr} numberOfLines={1}>📍 {item.address}</Text>
-          <Text style={styles.rentVal}>₹{minRent.toLocaleString('en-IN')}/mo</Text>
-        </View>
-        <View style={styles.arrowWrap}>
-          <Text style={styles.arrowIcon}>↗</Text>
+          <View style={{flexDirection: 'row', alignItems: 'center', marginBottom: 6}}>
+            <Ionicons name="location" size={10} color="#8b85a3" style={{marginRight: 2}} />
+            <Text style={styles.cardAddr} numberOfLines={1}>{item.address || 'Near Technology'}</Text>
+          </View>
+
+          <View style={styles.ratingRow}>
+            <Ionicons name="star" size={12} color="#f59e0b" style={{marginRight: 2}} />
+            <Text style={styles.ratingText}>{item.rating > 0 ? item.rating.toFixed(1) : '4.0'}</Text>
+            <View style={styles.genderTag}>
+              <Ionicons name={item.gender === 'boys' ? 'male' : item.gender === 'girls' ? 'female' : 'people'} size={10} color="#5f5a75" style={{marginRight: 2}} />
+              <Text style={styles.genderText}>
+                {item.gender === 'boys' ? 'Boys' : item.gender === 'girls' ? 'Girls' : 'Co-living'}
+              </Text>
+            </View>
+          </View>
+
+          <View style={styles.footerRow}>
+            <Text style={styles.rentPrice}>₹{minRent.toLocaleString('en-IN')}<Text style={styles.rentMo}>/mo</Text></Text>
+            {item.foodIncluded && (
+              <View style={{flexDirection: 'row', alignItems: 'center'}}>
+                <Ionicons name="restaurant" size={10} color="#10b981" style={{marginRight: 2}} />
+                <Text style={styles.foodTag}>Food</Text>
+              </View>
+            )}
+          </View>
         </View>
       </TouchableOpacity>
     );
@@ -112,86 +142,42 @@ export default function SearchScreen({ navigation }) {
 
   return (
     <SafeAreaView style={styles.container}>
+      <StatusBar barStyle="dark-content" backgroundColor="#ffffff" />
+      
       {/* Search Header */}
-      <View style={styles.searchHeader}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
-          <Text style={styles.backBtnIcon}>←</Text>
-        </TouchableOpacity>
-        <View style={styles.searchInputWrap}>
-          <Text style={styles.searchIcon}>🔍</Text>
+      <View style={styles.headerContainer}>
+        <View style={styles.searchBar}>
+          <Ionicons name="search-outline" size={20} color="#9ca3af" style={styles.searchIcon} />
           <TextInput
-            ref={inputRef}
             style={styles.searchInput}
-            placeholder="Search by name, area, or college..."
+            placeholder="Search hostels, area, college..."
+            placeholderTextColor="#9ca3af"
             value={search}
             onChangeText={setSearch}
-            onSubmitEditing={handleSearchSubmit}
-            placeholderTextColor="#a09abc"
             returnKeyType="search"
           />
-          {search.length > 0 && (
-            <TouchableOpacity onPress={() => setSearch('')} style={{ padding: 4 }}>
-              <Text style={styles.clearBtn}>✕</Text>
-            </TouchableOpacity>
-          )}
+          <TouchableOpacity style={styles.filterBtn} onPress={() => navigation.navigate('Filter')}>
+            <Ionicons name="options-outline" size={22} color="#6b7280" />
+            {advancedFilters && <View style={styles.filterBadge} />}
+          </TouchableOpacity>
         </View>
       </View>
 
       {/* Main Content */}
-      <View style={{ flex: 1 }}>
-        {search.length === 0 ? (
-          /* Recent History View */
-          <View style={styles.historyContainer}>
-            {searchHistory.length > 0 ? (
-              <>
-                <View style={styles.historyHeader}>
-                  <Text style={styles.historyTitle}>Recent Searches</Text>
-                  <TouchableOpacity onPress={clearHistory}>
-                    <Text style={styles.historyClear}>Clear</Text>
-                  </TouchableOpacity>
-                </View>
-                {searchHistory.map((h, i) => (
-                  <TouchableOpacity
-                    key={i}
-                    style={styles.historyItem}
-                    onPress={() => { setSearch(h); addToHistory(h); }}
-                  >
-                    <Text style={styles.historyClock}>🕐</Text>
-                    <Text style={styles.historyText}>{h}</Text>
-                    <Text style={styles.historyArrow}>↖</Text>
-                  </TouchableOpacity>
-                ))}
-              </>
-            ) : (
-              <View style={styles.emptyState}>
-                <Text style={styles.emptyIcon}>🔍</Text>
-                <Text style={styles.emptyTitle}>Find your perfect stay</Text>
-                <Text style={styles.emptySub}>Start typing to search across all hostels.</Text>
-              </View>
-            )}
+      <View style={styles.listContainer}>
+        {loading ? (
+          <View style={styles.center}>
+            <ActivityIndicator size="large" color="#4F46E5" />
           </View>
         ) : (
-          /* Search Results */
-          loading ? (
-            <View style={styles.center}>
-              <ActivityIndicator size="large" color="#4F46E5" />
-            </View>
-          ) : (
-            <FlatList
-              data={hostels}
-              renderItem={renderHostelCard}
-              keyExtractor={item => item._id}
-              contentContainerStyle={styles.listContent}
-              keyboardShouldPersistTaps="handled"
-              ListEmptyComponent={
-                <View style={styles.emptyState}>
-                  <Text style={styles.emptyIcon}>🙈</Text>
-                  <Text style={styles.emptyTitle}>No matches found</Text>
-                  <Text style={styles.emptySub}>Try searching for a different area or name.</Text>
-                </View>
-              }
-            />
-          )
+          <FlatList
+            data={displayResults}
+            renderItem={renderHostelCard}
+            keyExtractor={item => item._id}
+            contentContainerStyle={styles.listContent}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+          />
         )}
       </View>
     </SafeAreaView>
@@ -199,48 +185,123 @@ export default function SearchScreen({ navigation }) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F9FAFB' },
-  searchHeader: {
-    flexDirection: 'row', alignItems: 'center',
-    paddingHorizontal: 12, paddingVertical: 10,
-    borderBottomWidth: 1, borderBottomColor: '#f0f0f0',
+  container: { 
+    flex: 1, 
+    backgroundColor: '#ffffff' 
+  },
+  headerContainer: {
+    paddingHorizontal: 20,
+    paddingTop: 16,
+    paddingBottom: 10,
     backgroundColor: '#ffffff'
   },
-  backBtn: { padding: 8, marginRight: 4 },
-  backBtnIcon: { fontSize: 24, color: '#1e1b29', fontWeight: 'bold' },
-  searchInputWrap: {
-    flex: 1, flexDirection: 'row', alignItems: 'center',
-    backgroundColor: '#f5f5f5', borderRadius: 12,
-    paddingHorizontal: 12, height: 44
+  searchBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#ffffff',
+    borderWidth: 1,
+    borderColor: '#f3f4f6',
+    borderRadius: 24,
+    paddingHorizontal: 16,
+    height: 52,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 10,
+    elevation: 3,
   },
-  searchIcon: { fontSize: 16, marginRight: 8, color: '#8b85a3' },
-  searchInput: { flex: 1, fontSize: 16, color: '#1e1b29' },
-  clearBtn: { fontSize: 16, color: '#8b85a3' },
-  historyContainer: { padding: 20 },
-  historyHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
-  historyTitle: { fontSize: 16, fontWeight: 'bold', color: '#1e1b29' },
-  historyClear: { fontSize: 14, color: '#4F46E5', fontWeight: '600' },
-  historyItem: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#f5f5f5' },
-  historyClock: { fontSize: 16, marginRight: 12 },
-  historyText: { flex: 1, fontSize: 16, color: '#5f5a75' },
-  historyArrow: { fontSize: 18, color: '#c4b5fd' },
-  listContent: { padding: 16 },
+  searchIcon: { 
+    marginRight: 10 
+  },
+  searchInput: { 
+    flex: 1, 
+    fontSize: 15, 
+    color: '#1f2937' 
+  },
+  filterBtn: {
+    position: 'relative',
+    padding: 4,
+  },
+  filterBadge: {
+    position: 'absolute',
+    top: 4,
+    right: 4,
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#ef4444',
+  },
+  chipsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 16,
+    gap: 10,
+  },
+  chip: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+  },
+  chipActive: {
+    backgroundColor: '#e0e7ff',
+  },
+  chipInactive: {
+    backgroundColor: '#f3e8ff',
+  },
+  chipTextActive: {
+    color: '#4F46E5',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  chipTextInactive: {
+    color: '#4F46E5',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  filterOutlineBtn: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+    backgroundColor: '#ffffff',
+    marginLeft: 'auto',
+  },
+  filterOutlineText: {
+    color: '#4b5563',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  listContainer: {
+    flex: 1,
+    backgroundColor: '#ffffff',
+  },
+  listContent: { 
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    paddingBottom: 30,
+  },
   card: {
-    flexDirection: 'row', alignItems: 'center',
-    backgroundColor: '#ffffff', padding: 12, marginBottom: 12,
-    borderRadius: 12, borderWidth: 1, borderColor: '#f0f0f0',
-    shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.04, shadowRadius: 8, elevation: 2
+    backgroundColor: '#ffffff', borderRadius: 12, overflow: 'hidden', marginBottom: 16,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.08, shadowRadius: 8, elevation: 3
   },
-  cardImg: { width: 60, height: 60, borderRadius: 8, backgroundColor: '#f0ecfd' },
-  cardInfo: { flex: 1, marginLeft: 12, justifyContent: 'center' },
-  cardTitle: { fontSize: 15, fontWeight: 'bold', color: '#1e1b29', marginBottom: 4 },
-  cardAddr: { fontSize: 12, color: '#8b85a3', marginBottom: 4 },
-  rentVal: { fontSize: 14, fontWeight: 'bold', color: '#4F46E5' },
-  arrowWrap: { padding: 10 },
-  arrowIcon: { fontSize: 18, color: '#a09abc' },
-  center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  emptyState: { alignItems: 'center', marginTop: 80 },
-  emptyIcon: { fontSize: 48, marginBottom: 16 },
-  emptyTitle: { fontSize: 18, fontWeight: 'bold', color: '#1e1b29', marginBottom: 8 },
-  emptySub: { fontSize: 14, color: '#8b85a3' }
+  image: { width: '100%', height: 200, backgroundColor: '#e2dff0' },
+  premiumBadge: { position: 'absolute', top: 6, left: 6, backgroundColor: '#f59e0b', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 },
+  premiumText: { color: '#ffffff', fontSize: 9, fontWeight: 'bold' },
+  cardInfo: { padding: 10 },
+  cardTitle: { fontSize: 14, fontWeight: 'bold', color: '#1e1b29', marginBottom: 2 },
+  cardAddr: { fontSize: 11, color: '#8b85a3' },
+  ratingRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 8 },
+  ratingText: { fontSize: 12, fontWeight: 'bold', color: '#f59e0b', marginRight: 8 },
+  genderTag: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#f0ecfd', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 },
+  genderText: { fontSize: 10, color: '#5f5a75' },
+  footerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderTopWidth: 1, borderTopColor: '#f5f5f5', paddingTop: 8 },
+  rentPrice: { fontSize: 14, fontWeight: 'bold', color: '#4F46E5' },
+  rentMo: { fontSize: 10, color: '#a09abc', fontWeight: 'normal' },
+  foodTag: { fontSize: 10, color: '#10b981', fontWeight: 'bold' },
+  center: { 
+    flex: 1, 
+    justifyContent: 'center', 
+    alignItems: 'center' 
+  },
 });

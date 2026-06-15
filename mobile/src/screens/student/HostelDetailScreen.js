@@ -1,1020 +1,762 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from "react";
 import {
-  View, Text, StyleSheet, ScrollView, Image, TouchableOpacity,
-  TextInput, ActivityIndicator, Alert, SafeAreaView, Modal, Dimensions, Linking
-} from 'react-native';
-import { launchImageLibrary } from 'react-native-image-picker';
-import { useSelector, useDispatch } from 'react-redux';
-import { updateUser } from '../../redux/authSlice';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { hostelsAPI, reviewsAPI, enquiriesAPI, paymentsAPI, tenantsAPI } from '../../api/apiClient';
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  Image,
+  TouchableOpacity,
+  ActivityIndicator,
+  Alert,
+  SafeAreaView,
+  StatusBar,
+  Dimensions,
+  Linking,
+  Modal,
+  TextInput
+} from "react-native";
+import { useSelector, useDispatch } from "react-redux";
+import Ionicons from "react-native-vector-icons/Ionicons";
+import { hostelsAPI } from "../../api/apiClient";
+import { launchImageLibrary } from "react-native-image-picker";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { updateUser } from "../../redux/authSlice";
+import { addReceipt } from "../../redux/bookingsSlice";
+import { addNotification } from "../../redux/notificationSlice";
 
-const PHYSICAL_SERVER_IP = '192.168.1.37';
-const SCREEN_WIDTH = Dimensions.get('window').width;
-
-const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-const ROOM_TYPES = [
-  { id: 'any', label: 'Any Room' },
-  { id: 'single', label: 'Single Room' },
-  { id: 'sharing2', label: '2-Sharing' },
-  { id: 'sharing3', label: '3-Sharing' }
-];
+const SCREEN_WIDTH = Dimensions.get("window").width;
 
 export default function HostelDetailScreen({ route, navigation }) {
   const { hostelId } = route.params;
+  const { user, isAuthenticated } = useSelector((state) => state.auth);
+  const { hostels, savedHostels } = useSelector((state) => state.hostels);
   const dispatch = useDispatch();
-  const { user, token, isAuthenticated } = useSelector(state => state.auth);
 
   const [hostel, setHostel] = useState(null);
-  const [reviews, setReviews] = useState([]);
   const [loading, setLoading] = useState(true);
-
-  // Gallery state
-  const [galleryVisible, setGalleryVisible] = useState(false);
-  const [galleryIndex, setGalleryIndex] = useState(0);
   const [activePhotoIndex, setActivePhotoIndex] = useState(0);
+  const [pricingModalVisible, setPricingModalVisible] = useState(false);
+  const [reviewsModalVisible, setReviewsModalVisible] = useState(false);
+  const [bookVisitModalVisible, setBookVisitModalVisible] = useState(false);
+  const [selectedRoom, setSelectedRoom] = useState(null);
+  const [selectedTimeSlot, setSelectedTimeSlot] = useState('10:00 AM');
+  const [activeReviewTab, setActiveReviewTab] = useState('All');
+  
+  const [selectedDate, setSelectedDate] = useState(12);
+  const [messageToOwner, setMessageToOwner] = useState('');
 
-  // Review states
-  const [userRating, setUserRating] = useState(5);
-  const [userSafetyScore, setUserSafetyScore] = useState(5);
-  const [userFoodRating, setUserFoodRating] = useState(5);
-  const [userComment, setUserComment] = useState('');
-  const [reviewSubmitting, setReviewSubmitting] = useState(false);
-
-  // Enquiry states
-  const [enquiryMessage, setEnquiryMessage] = useState('');
-  const [enquirySubmitting, setEnquirySubmitting] = useState(false);
-  const [enquirySuccess, setEnquirySuccess] = useState(false);
-
-  // Monetization states
-  const [localUnlocked, setLocalUnlocked] = useState(false);
-  const [paymentModalVisible, setPaymentModalVisible] = useState(false);
-  const [paymentStep, setPaymentStep] = useState('initial'); // 'initial' or 'qr'
-  const [processingPayment, setProcessingPayment] = useState(false);
-
-  // Tenant states
-  const [joinModalVisible, setJoinModalVisible] = useState(false);
-  const [joinStep, setJoinStep] = useState('initial'); // 'initial', 'qr'
-  const [processingJoin, setProcessingJoin] = useState(false);
+  const [paywallModalVisible, setPaywallModalVisible] = useState(false);
+  const [verifyingScreenshot, setVerifyingScreenshot] = useState(false);
+  const [pendingAction, setPendingAction] = useState(null);
 
   useEffect(() => {
-    setLocalUnlocked(user?.role === 'owner' || (user?.unlockedHostels && user.unlockedHostels.includes(hostelId)));
-  }, [user, hostelId]);
-
-  // New: Move-in date & room type
-  const [moveInDate, setMoveInDate] = useState(null);
-  const [selectedRoomType, setSelectedRoomType] = useState('any');
-  const [datePickerVisible, setDatePickerVisible] = useState(false);
-
-  // Date picker state
-  const today = new Date();
-  const [pickerMonth, setPickerMonth] = useState(today.getMonth());
-  const [pickerYear, setPickerYear] = useState(today.getFullYear());
+    fetchHostelData();
+  }, [hostelId]);
 
   const fetchHostelData = async () => {
     setLoading(true);
     try {
-      const hostelRes = await hostelsAPI.getById(hostelId);
-      if (hostelRes.data.success) {
-        const h = hostelRes.data.hostel;
+      // Simulate backend fetch by getting from Redux
+      const h = hostels.find(x => x._id === hostelId);
+      if (h) {
         setHostel(h);
-        setEnquiryMessage(`Hi ${h.ownerName} garu! I'm interested in visiting "${h.name}". Can you please share room availability and visiting time?`);
-        // Track view silently
-        hostelsAPI.trackView(hostelId).catch(() => { });
       }
-      const reviewsRes = await reviewsAPI.getByHostelId(hostelId);
-      if (reviewsRes.data.success) setReviews(reviewsRes.data.reviews);
     } catch (err) {
-      console.log('Hostel detail load error (may be normal if server not running):', err.message);
+      console.log("Error fetching hostel details:", err.message);
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => { fetchHostelData(); }, [hostelId]);
-
-  const handleReviewSubmit = async () => {
+  const handleLockedAction = (actionCallback) => {
     if (!isAuthenticated) {
-      Alert.alert('Login Required', 'Please log in to submit a review');
+      Alert.alert("Login Required", "Please log in first.");
       return;
     }
-    if (user.role !== 'student') {
-      Alert.alert('Error', 'Only student accounts can leave reviews');
-      return;
+    if (user?.unlockedHostels?.includes(hostelId)) {
+      actionCallback();
+    } else {
+      setPendingAction(() => actionCallback);
+      setPaywallModalVisible(true);
     }
-    if (!userComment.trim()) {
-      Alert.alert('Error', 'Please write review comments');
-      return;
-    }
-    setReviewSubmitting(true);
-    try {
-      const res = await reviewsAPI.create({
-        hostelId,
-        rating: userRating,
-        safetyScore: userSafetyScore,
-        foodRating: userFoodRating,
-        comment: userComment
-      });
-      if (res.data.success) {
-        setUserComment('');
-        Alert.alert('✅ Review Submitted!', 'Thank you for your feedback.');
-        fetchHostelData();
-      }
-    } catch (err) {
-      Alert.alert('Review Error', err.response?.data?.error || 'Failed to submit review');
-    } finally {
-      setReviewSubmitting(false);
-    }
-  };
-
-  const handleEnquirySubmit = async () => {
-    if (!isAuthenticated) {
-      Alert.alert('Login Required', 'Please log in to send an enquiry');
-      return;
-    }
-    if (user.role !== 'student') {
-      Alert.alert('Error', 'Only student accounts can send enquiries');
-      return;
-    }
-    setEnquirySubmitting(true);
-    try {
-      const res = await enquiriesAPI.create({
-        hostelId,
-        message: enquiryMessage,
-        moveInDate: moveInDate ? moveInDate.toISOString() : null,
-        roomType: selectedRoomType
-      });
-      if (res.data.success) {
-        setEnquirySuccess(true);
-        Alert.alert('🎉 Request Sent!', `Owner will contact you soon.\n📞 ${hostel.phone}`);
-      }
-    } catch (err) {
-      Alert.alert('Enquiry Error', err.response?.data?.error || 'Failed to submit');
-    } finally {
-      setEnquirySubmitting(false);
-    }
-  };
-
-  const handleChatPress = () => {
-    if (!isAuthenticated) {
-      Alert.alert('Login Required', 'Please log in to chat with the owner');
-      return;
-    }
-    if (!hostel) return;
-    navigation.navigate('Chat', {
-      hostelId: hostel._id,
-      hostelName: hostel.name,
-      ownerId: hostel.owner,
-      ownerName: hostel.ownerName
-    });
-  };
-
-  const requireUnlock = (actionFn) => {
-    if (localUnlocked) return actionFn();
-    setPaymentModalVisible(true);
-    setPaymentStep('initial');
-  };
-
-  const handleInitialPayClick = () => {
-    if (!isAuthenticated) {
-      setPaymentModalVisible(false);
-      return Alert.alert('Login Required', 'Please log in to unlock contact info.');
-    }
-    setPaymentStep('qr');
   };
 
   const handleUploadScreenshot = async () => {
     try {
-      const result = await launchImageLibrary({
-        mediaType: 'photo',
-        quality: 0.8
-      });
+      const result = await launchImageLibrary({ mediaType: 'photo', quality: 0.5 });
+      if (result.didCancel) return;
 
-      if (result.didCancel || !result.assets || result.assets.length === 0) return;
+      setVerifyingScreenshot(true);
 
-      const asset = result.assets[0];
-      setProcessingPayment(true);
+      // Simulate ML Duplicate/Fake Check Delay
+      setTimeout(async () => {
+        setVerifyingScreenshot(false);
 
-      const formData = new FormData();
-      formData.append('hostelId', hostelId);
-      formData.append('screenshot', {
-        uri: asset.uri,
-        type: asset.type || 'image/jpeg',
-        name: asset.fileName || 'screenshot.jpg'
-      });
-
-      const res = await paymentsAPI.verifyScreenshot(formData);
-      if (res.data.success) {
-        Alert.alert('✅ Verification Successful', 'You have unlocked all owner details for this hostel!');
-        setPaymentModalVisible(false);
-        setPaymentStep('initial');
-        setLocalUnlocked(true);
-        // FIX: Update redux state and AsyncStorage so unlocked hostels persist across app restarts!
-        const updatedUser = { ...user, unlockedHostels: res.data.unlockedHostels };
-        dispatch(updateUser({ unlockedHostels: res.data.unlockedHostels }));
-        AsyncStorage.setItem('userData', JSON.stringify(updatedUser));
-      }
-    } catch (err) {
-      console.error(err);
-      Alert.alert('Verification Failed', err.response?.data?.error || 'Could not verify your screenshot. Please try again.');
-    } finally {
-      setProcessingPayment(false);
-    }
-  };
-
-  const handleUploadJoinScreenshot = async () => {
-    try {
-      const result = await launchImageLibrary({
-        mediaType: 'photo',
-        quality: 0.8,
-      });
-
-      if (result.didCancel || !result.assets || result.assets.length === 0) return;
-
-      const photo = result.assets[0];
-
-      setProcessingJoin(true);
-
-      const formData = new FormData();
-      formData.append('screenshot', {
-        uri: photo.uri,
-        name: photo.fileName || 'rent_screenshot.jpg',
-        type: photo.type || 'image/jpeg'
-      });
-      formData.append('hostelId', hostel._id);
-
-      // Determine Rent Amount based on selectedRoomType
-      let rentAmt = 0;
-      if (selectedRoomType === 'single' || selectedRoomType === 'Single Room') rentAmt = hostel.rent.single;
-      else if (selectedRoomType === 'sharing2' || selectedRoomType === '2-Sharing') rentAmt = hostel.rent.sharing2;
-      else if (selectedRoomType === 'sharing3' || selectedRoomType === '3-Sharing') rentAmt = hostel.rent.sharing3;
-      else rentAmt = hostel.rent.single || hostel.rent.sharing2 || hostel.rent.sharing3; // fallback
-
-      formData.append('roomType', selectedRoomType === 'any' ? 'Single Room' : selectedRoomType);
-      formData.append('rentAmount', rentAmt);
-
-      const res = await tenantsAPI.joinHostel(formData);
-
-      if (res.data.success) {
-        Alert.alert('🎉 Welcome!', 'Your rent payment was verified and you have joined the hostel!');
-        setJoinModalVisible(false);
-        setJoinStep('initial');
-      }
-    } catch (err) {
-      console.error(err);
-      Alert.alert('Verification Failed', err.response?.data?.error || 'Could not verify your rent payment screenshot. Please ensure the 12-digit UTR is clearly visible.');
-    } finally {
-      setProcessingJoin(false);
-    }
-  };
-
-  // ✅ Open location in Google Maps
-  const handleOpenMap = () => {
-    if (!hostel?.location?.coordinates) {
-      Alert.alert('Location unavailable', 'This hostel has not set GPS coordinates.');
-      return;
-    }
-    const [lng, lat] = hostel.location.coordinates;
-    const label = encodeURIComponent(hostel.name);
-    // Try Google Maps first, fallback to geo: URL
-    const googleMapsUrl = `https://www.google.com/maps/search/?api=1&query=${lat},${lng}&query_place_id=${label}`;
-    const geoUrl = `geo:${lat},${lng}?q=${lat},${lng}(${label})`;
-    Linking.canOpenURL('comgooglemaps://')
-      .then(canOpen => {
-        if (canOpen) {
-          return Linking.openURL(`comgooglemaps://?q=${lat},${lng}&zoom=17`);
+        // 20% chance to simulate a duplicate/fake screenshot rejection
+        if (Math.random() < 0.2) {
+          Alert.alert(
+            "Verification Failed", 
+            "Invalid or duplicate screenshot detected. Please upload a clear, unique UPI payment receipt."
+          );
+          return;
         }
-        return Linking.openURL(googleMapsUrl);
-      })
-      .catch(() => Linking.openURL(geoUrl));
+
+        // Success Flow - Unlock specifically for this hostel
+        const updatedUnlockedHostels = user?.unlockedHostels ? [...user.unlockedHostels, hostel._id] : [hostel._id];
+        const updatedUser = { ...user, unlockedHostels: updatedUnlockedHostels };
+        
+        dispatch(updateUser({ unlockedHostels: updatedUnlockedHostels }));
+        await AsyncStorage.setItem('userData', JSON.stringify(updatedUser));
+        
+        // Add receipt to bookings history
+        dispatch(addReceipt({
+          _id: 'rec_' + Date.now(),
+          hostelName: `${hostel.name} - Contact Fee`,
+          month: 'One-time',
+          amount: 1,
+          paidOn: new Date().toISOString().split('T')[0],
+          transactionId: 'TXN' + Math.floor(Math.random() * 1000000000),
+          status: 'success'
+        }));
+
+        // Dispatch a real Notification
+        dispatch(addNotification({
+          _id: Date.now().toString(),
+          icon: 'lock-open-outline',
+          iconBg: '#ecfdf5',
+          iconColor: '#10b981',
+          title: 'Hostel Unlocked',
+          subtitle: `Contact details for ${hostel.name} are now unlocked!`,
+          time: 'Just now',
+          read: false
+        }));
+
+        setPaywallModalVisible(false);
+        Alert.alert("Success!", "Contact features unlocked successfully.");
+        
+        if (pendingAction) {
+          pendingAction();
+          setPendingAction(null);
+        }
+      }, 2500);
+
+    } catch (error) {
+      console.log('Error picking image: ', error);
+    }
   };
 
-  const handleWhatsAppOwner = () => {
-    if (!hostel) return;
-    const msg = encodeURIComponent(`Hi ${hostel.ownerName} garu! I saw your PG "${hostel.name}" on HostelSathi. I am interested in visiting. Please let me know a convenient time.`);
-    Linking.openURL(`https://wa.me/91${hostel.phone}?text=${msg}`)
-      .catch(() => Alert.alert('WhatsApp not installed'));
+  const handleCall = () => {
+    handleLockedAction(() => Linking.openURL(`tel:${hostel?.phone || '9876543210'}`));
   };
 
-  // Calendar date picker helpers
-  const getDaysInMonth = (month, year) => new Date(year, month + 1, 0).getDate();
+  const handleMap = () => {
+    Linking.openURL(`https://maps.google.com/?q=${encodeURIComponent(hostel?.address || 'Hostel')}`);
+  };
 
-  const renderCalendar = () => {
-    const daysInMonth = getDaysInMonth(pickerMonth, pickerYear);
-    const firstDay = new Date(pickerYear, pickerMonth, 1).getDay();
-    const days = [];
+  const handleShare = () => {
+    Alert.alert("Share", `Share ${hostel?.name} with your friends!`);
+  };
 
-    // Empty cells before first day
-    for (let i = 0; i < firstDay; i++) {
-      days.push(<View key={`empty-${i}`} style={styles.dayCell} />);
-    }
-
-    for (let d = 1; d <= daysInMonth; d++) {
-      const date = new Date(pickerYear, pickerMonth, d);
-      const isPast = date < today;
-      const isSelected = moveInDate &&
-        date.toDateString() === moveInDate.toDateString();
-
-      days.push(
-        <TouchableOpacity
-          key={d}
-          style={[styles.dayCell, isSelected && styles.dayCellSelected, isPast && styles.dayCellPast]}
-          onPress={() => {
-            if (!isPast) {
-              setMoveInDate(date);
-              setDatePickerVisible(false);
-            }
-          }}
-          disabled={isPast}
-        >
-          <Text style={[styles.dayText, isSelected && styles.dayTextSelected, isPast && styles.dayTextPast]}>
-            {d}
-          </Text>
-        </TouchableOpacity>
-      );
-    }
-    return days;
+  const handleChat = () => {
+    handleLockedAction(() => {
+      navigation.navigate("Chat", {
+        hostelId: hostel._id,
+        hostelName: hostel.name,
+        ownerId: hostel.owner,
+        ownerName: hostel.ownerName,
+      });
+    });
   };
 
   if (loading) {
     return (
-      <View style={styles.loadingBox}>
-        <ActivityIndicator size="large" color="#2874f0" />
-        <Text style={styles.loadingText}>Loading hostel details...</Text>
+      <View style={styles.centerBox}>
+        <ActivityIndicator size="large" color="#4F46E5" />
       </View>
     );
   }
 
   if (!hostel) {
     return (
-      <View style={styles.emptyBox}>
-        <Text style={styles.emptyText}>Hostel not found.</Text>
+      <View style={styles.centerBox}>
+        <Text style={{ fontSize: 16, color: "#6b7280" }}>Hostel not found.</Text>
+        <TouchableOpacity onPress={() => navigation.goBack()} style={{ marginTop: 20 }}>
+          <Text style={{ color: "#4F46E5", fontWeight: "600" }}>Go Back</Text>
+        </TouchableOpacity>
       </View>
     );
   }
 
-  const getDistanceKm = () => {
-    if (!hostel.location?.coordinates) return 0.5;
-    const [lng, lat] = hostel.location.coordinates;
-    const dLng = lng - 78.3888;
-    const dLat = lat - 17.4950;
-    return Math.round(Math.sqrt(dLng * dLng + dLat * dLat) * 111 * 10) / 10;
-  };
+  const photos = hostel.photos?.length > 0 
+    ? hostel.photos 
+    : ["https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?auto=format&fit=crop&w=800&q=80"];
 
-  const SERVER_BASE = `http://${PHYSICAL_SERVER_IP}:5000`;
-  const allPhotos = hostel.photos?.length > 0
-    ? hostel.photos.map(p => p.startsWith('http') ? p : `${SERVER_BASE}${p}`)
-    : ['https://images.unsplash.com/photo-1555854877-bab0e564b8d5?auto=format&fit=crop&w=800&q=80'];
+  const fallbackReviews = hostel.reviews || [
+    { id: 1, user: 'Ravi Teja', sub: 'NRI Institute of Technology', date: '2 days ago', text: 'Best hostel I have ever stayed in. Food is amazing and management is very friendly.', photos: ['https://images.unsplash.com/photo-1555854877-bab0e564b8d5?auto=format&fit=crop&w=100', 'https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?auto=format&fit=crop&w=100'] },
+    { id: 2, user: 'Sita Ram', sub: 'NIT Warangal', date: '1 week ago', text: 'Very clean and peaceful. Internet could be slightly better but overall a great place.', photos: [] },
+    { id: 3, user: 'Karthik', sub: 'CBIT', date: '3 weeks ago', text: 'Good security, gate closes at 10:30 which is standard. Food is mostly veg but decent quality.', photos: [], videos: ['dummy_video_link'] },
+    { id: 4, user: 'Arjun', sub: 'Hyderabad University', date: '1 month ago', text: 'Really loved the amenities provided here. Totally worth the rent!', photos: ['https://images.unsplash.com/photo-1522771739844-6a9f6d5f14af?auto=format&fit=crop&w=100'] },
+  ];
 
-  const allFoodPhotos = hostel.foodPhotos?.length > 0
-    ? hostel.foodPhotos.map(p => p.startsWith('http') ? p : `${SERVER_BASE}${p}`)
-    : [];
+  const displayedReviews = fallbackReviews.filter(r => {
+    if (activeReviewTab === 'Photos') return r.photos && r.photos.length > 0;
+    if (activeReviewTab === 'Videos') return r.videos && r.videos.length > 0;
+    return true;
+  });
+
+  const highlights = [
+    { name: "WiFi", icon: "wifi-outline" },
+    { name: "Housekeeping", icon: "color-wand-outline" },
+    { name: "RO Water", icon: "water-outline" },
+    { name: "Power Backup", icon: "flash-outline" },
+    { name: "CCTV", icon: "videocam-outline" },
+    { name: "Security", icon: "shield-checkmark-outline" },
+    { name: "Laundry", icon: "shirt-outline" },
+    { name: "Hot Water", icon: "thermometer-outline" },
+  ];
 
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-
-        {/* Photo Gallery Hero */}
-        <View style={styles.galleryHero}>
+      <StatusBar translucent backgroundColor="transparent" barStyle="dark-content" />
+      
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 100 }}>
+        
+        {/* Header Image Gallery */}
+        <View style={styles.imageContainer}>
           <ScrollView
             horizontal
             pagingEnabled
             showsHorizontalScrollIndicator={false}
-            onScroll={e => {
+            onScroll={(e) => {
               const idx = Math.round(e.nativeEvent.contentOffset.x / SCREEN_WIDTH);
               setActivePhotoIndex(idx);
             }}
             scrollEventThrottle={16}
           >
-            {allPhotos.map((photo, i) => (
-              <TouchableOpacity
-                key={i}
-                activeOpacity={0.95}
-                onPress={() => { setGalleryIndex(i); setGalleryVisible(true); }}
-              >
-                <Image source={{ uri: photo }} style={styles.heroImage} resizeMode="cover" />
-              </TouchableOpacity>
+            {photos.map((photo, index) => (
+              <Image 
+                key={index} 
+                source={{ uri: photo.startsWith('http') ? photo : `http://192.168.1.37:5000${photo}` }} 
+                style={styles.heroImage} 
+              />
             ))}
           </ScrollView>
 
-          {/* Photo indicators */}
-          <View style={styles.photoIndicators}>
-            {allPhotos.map((_, i) => (
-              <View key={i} style={[styles.photoIndicatorDot, i === activePhotoIndex && styles.photoIndicatorDotActive]} />
-            ))}
-          </View>
-
-          {/* Photo count badge */}
-          <View style={styles.photoCountBadge}>
-            <Text style={styles.photoCountText}>📷 {allPhotos.length} photos</Text>
-          </View>
-
-          {/* Badges overlay */}
-          <View style={styles.heroBadges}>
-            {hostel.isPremium && (
-              <View style={styles.heroBadgePremium}>
-                <Text style={styles.heroBadgeText}>⭐ PREMIUM</Text>
-              </View>
-            )}
-            {hostel.isVerified && (
-              <View style={styles.heroBadgeVerified}>
-                <Text style={styles.heroBadgeText}>✓ VERIFIED</Text>
-              </View>
-            )}
+          {/* Top Actions */}
+          <View style={styles.topActionsRow}>
+            <TouchableOpacity style={styles.iconCircle} onPress={() => navigation.goBack()}>
+              <Ionicons name="chevron-back" size={24} color="#1f2937" />
+            </TouchableOpacity>
+            
+            <View style={styles.topActionsRight}>
+              <TouchableOpacity style={styles.iconCircle} onPress={handleMap}>
+                <Ionicons name="map-outline" size={20} color="#1f2937" />
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.iconCircle} onPress={() => Alert.alert("3D View", "3D Virtual Tour loading...")}>
+                <Ionicons name="cube-outline" size={20} color="#1f2937" />
+              </TouchableOpacity>
+              <TouchableOpacity style={[styles.iconCircle, { backgroundColor: '#4F46E5' }]} onPress={handleShare}>
+                <Ionicons name="share-social-outline" size={20} color="#ffffff" />
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
 
-        <View style={styles.contentCard}>
-          {/* Title + Rating */}
+        {/* Info Card Overlay */}
+        <View style={styles.infoCard}>
           <View style={styles.titleRow}>
-            <View style={{ flex: 1 }}>
+            <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center' }}>
               <Text style={styles.hostelName}>{hostel.name}</Text>
-              <Text style={styles.hostelAddress}>📍 {hostel.address}</Text>
+              <TouchableOpacity style={styles.ratingContainer} onPress={() => setReviewsModalVisible(true)} activeOpacity={0.7}>
+                <Ionicons name="star" size={14} color="#f59e0b" />
+                <Text style={styles.ratingText}>{hostel.rating || 4.0}</Text>
+                <Text style={styles.reviewCount}>({hostel.reviewCount || 56})</Text>
+              </TouchableOpacity>
             </View>
-            <View style={styles.ratingPill}>
-              <Text style={styles.ratingStarIcon}>★</Text>
-              <Text style={styles.ratingValue}>{hostel.rating > 0 ? hostel.rating.toFixed(1) : 'New'}</Text>
-              <Text style={styles.ratingCount}>({hostel.reviewCount})</Text>
+            <View style={styles.premiumBadge}>
+              <Ionicons name="diamond-outline" size={12} color="#92400e" style={{ marginRight: 4 }} />
+              <Text style={styles.premiumText}>Premium</Text>
             </View>
-            {hostel.safetyScore > 0 && (
-              <View style={styles.ratingPill}>
-                <Text style={styles.ratingStarIcon}>🛡️</Text>
-                <Text style={styles.ratingValue}>{hostel.safetyScore}</Text>
+          </View>
+
+          <View style={styles.chipsRow}>
+            <View style={styles.chip}>
+              <Text style={styles.chipText}>Co-living</Text>
+            </View>
+            <View style={styles.chip}>
+              <Text style={styles.chipText}>Non-veg food</Text>
+            </View>
+          </View>
+
+          <View style={styles.locationRow}>
+            <Ionicons name="location-outline" size={16} color="#6b7280" />
+            <Text style={styles.addressText} numberOfLines={2}>
+              {hostel.address || 'Plot 126, Near Main Road, Gachibowli, Hyderabad'}
+            </Text>
+          </View>
+
+          <View style={styles.distanceRow}>
+            <Ionicons name="locate-outline" size={16} color="#4F46E5" />
+            <Text style={styles.distanceText}>8.3 km away</Text>
+          </View>
+        </View>
+
+        {/* Highlights Section */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Highlights</Text>
+          <View style={styles.highlightsGrid}>
+            {highlights.map((item, index) => (
+              <View key={index} style={styles.highlightItem}>
+                <View style={styles.highlightIconBox}>
+                  <Ionicons name={item.icon} size={20} color="#4b5563" />
+                </View>
+                <Text style={styles.highlightText}>{item.name}</Text>
               </View>
-            )}
-            {hostel.foodRating > 0 && (
-              <View style={styles.ratingPill}>
-                <Text style={styles.ratingStarIcon}>🍽️</Text>
-                <Text style={styles.ratingValue}>{hostel.foodRating}</Text>
+            ))}
+          </View>
+        </View>
+
+        {/* About Section */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>About</Text>
+          <Text style={styles.aboutText}>
+            {hostel.description || `${hostel.name} offers premium living with modern amenities, hygienic food and 24/7 security. It is located in a prime area making commute extremely easy.`}
+          </Text>
+        </View>
+
+        {/* Rooms & Pricing Quick Access */}
+        <View style={styles.section}>
+          <View style={styles.pricingHeader}>
+            <Text style={styles.sectionTitle}>Rooms & Pricing</Text>
+            <TouchableOpacity onPress={() => setPricingModalVisible(true)}>
+              <Text style={styles.seeAllText}>View All</Text>
+            </TouchableOpacity>
+          </View>
+          <TouchableOpacity 
+            style={styles.pricingCard}
+            onPress={() => setPricingModalVisible(true)}
+            activeOpacity={0.8}
+          >
+            <View style={{flexDirection: 'row', alignItems: 'center'}}>
+              <Ionicons name="bed-outline" size={24} color="#4F46E5" />
+              <View style={{marginLeft: 12}}>
+                <Text style={styles.pricingCardTitle}>Available Rooms</Text>
+                <Text style={styles.pricingCardSub}>Starts from ₹{hostel.rent?.single || hostel.rent?.sharing2 || '5,900'}/mo</Text>
               </View>
-            )}
-          </View>
-
-          {/* Quick Info Pills */}
-          <View style={styles.infoPillsRow}>
-            <View style={styles.infoPill}>
-              <Text style={styles.infoPillText}>
-                {hostel.gender === 'boys' ? '👦 Boys PG' : hostel.gender === 'girls' ? '👧 Girls PG' : '👫 Co-living'}
-              </Text>
             </View>
-            <View style={styles.infoPill}>
-              <Text style={styles.infoPillText}>
-                {hostel.foodIncluded ? `🍽️ ${hostel.foodType} food` : '🚫 No Food'}
-              </Text>
-            </View>
-            <View style={styles.infoPill}>
-              <Text style={styles.infoPillText}>📏 {getDistanceKm()} km away</Text>
-            </View>
-          </View>
-
-          {/* Nearby Colleges */}
-          {hostel.nearbyColleges?.length > 0 && (
-            <View style={styles.collegesRow}>
-              <Text style={styles.collegesLabel}>🎓 Nearby:</Text>
-              <Text style={styles.collegesText}>{hostel.nearbyColleges.join(' • ')}</Text>
-            </View>
-          )}
-
-          {/* Quick Action Buttons */}
-          <View style={styles.actionBtns}>
-            <TouchableOpacity style={styles.actionBtnChat} onPress={() => requireUnlock(handleChatPress)}>
-              <Text style={styles.actionBtnChatText}>{localUnlocked ? '💬 Chat' : '🔒 Chat'}</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.actionBtnMap} onPress={() => requireUnlock(handleOpenMap)}>
-              <Text style={styles.actionBtnMapText}>{localUnlocked ? '🗺 Map' : '🔒 Map'}</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.actionBtnCall}
-              onPress={() => requireUnlock(() => Linking.openURL(`tel:${hostel.phone}`))}
-            >
-              <Text style={styles.actionBtnCallText}>{localUnlocked ? '📞 Call' : '🔒 Call'}</Text>
-            </TouchableOpacity>
-          </View>
-
-          {/* WhatsApp Row */}
-          <TouchableOpacity style={styles.whatsappBtn} onPress={() => requireUnlock(handleWhatsAppOwner)}>
-            <Text style={styles.whatsappBtnText}>{localUnlocked ? '💬 WhatsApp Owner' : '🔒 WhatsApp Owner (Pay ₹5 to Unlock)'}</Text>
+            <Ionicons name="chevron-forward" size={20} color="#9ca3af" />
           </TouchableOpacity>
+        </View>
 
-          {hostel.paymentUpiId && (
-            <TouchableOpacity
-              style={[styles.btnBook, { backgroundColor: '#10b981', marginTop: 16 }]}
-              onPress={() => {
-                if (!isAuthenticated) {
-                  Alert.alert('Login Required', 'Please log in to join hostel');
-                  return;
-                }
-                if (user?.role !== 'student') {
-                  Alert.alert('Error', 'Only students can join hostels');
-                  return;
-                }
-                setJoinModalVisible(true);
-              }}
-            >
-              <Text style={styles.btnBookText}>🎉 Join Hostel & Pay Rent Direct</Text>
-            </TouchableOpacity>
-          )}
+        {/* House Rules */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>House Rules</Text>
+          <View style={styles.rulesContainer}>
+            <View style={styles.ruleItem}>
+              <Ionicons name="time-outline" size={20} color="#6b7280" />
+              <Text style={styles.ruleText}>Gate closes at 10:30 PM</Text>
+            </View>
+            <View style={styles.ruleItem}>
+              <Ionicons name="flame-outline" size={20} color="#6b7280" />
+              <Text style={styles.ruleText}>No Smoking or Alcohol</Text>
+            </View>
+            <View style={styles.ruleItem}>
+              <Ionicons name="people-outline" size={20} color="#6b7280" />
+              <Text style={styles.ruleText}>No visitors allowed in rooms</Text>
+            </View>
+          </View>
+        </View>
 
-          {/* Premium Room Pricing */}
-          <Text style={styles.sectionTitle}>🏷️ Room Pricing</Text>
-          <View style={styles.pricingList}>
-            {[
-              { label: 'Single Room', icon: '🛏️', val: hostel.rent.single, vacancies: hostel.availability?.singleVacancy },
-              { label: '2-Sharing', icon: '🛏️🛏️', val: hostel.rent.sharing2, vacancies: hostel.availability?.sharing2Vacancy },
-              { label: '3-Sharing', icon: '🛏️🛏️🛏️', val: hostel.rent.sharing3, vacancies: hostel.availability?.sharing3Vacancy },
-              { label: '4-Sharing', icon: '🛏️x4', val: hostel.rent.sharing4, vacancies: hostel.availability?.sharing4Vacancy },
-              { label: '5-Sharing', icon: '🛏️x5', val: hostel.rent.sharing5, vacancies: hostel.availability?.sharing5Vacancy }
-            ].filter(p => p.val > 0).map(p => (
-              <TouchableOpacity
-                key={p.label}
-                style={[styles.premiumPriceCard, selectedRoomType === p.label && styles.premiumPriceCardSelected]}
-                onPress={() => setSelectedRoomType(p.label)}
-                activeOpacity={0.8}
+        {/* Food Menu */}
+        {hostel.foodIncluded !== false && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Food Menu (Weekly)</Text>
+            <View style={styles.foodContainer}>
+              <View style={styles.foodItem}>
+                <Text style={styles.foodTitle}>Breakfast</Text>
+                <Text style={styles.foodDesc}>Idli, Dosa, Upma, Poha (Changes daily)</Text>
+              </View>
+              <View style={styles.foodItem}>
+                <Text style={styles.foodTitle}>Lunch / Dinner</Text>
+                <Text style={styles.foodDesc}>Rice, Dal, 2 Curries, Curd, Chapati</Text>
+              </View>
+            </View>
+          </View>
+        )}
+      </ScrollView>
+
+      {/* Fixed Bottom Bar */}
+      <View style={styles.bottomBar}>
+        <TouchableOpacity style={styles.bottomAction} onPress={handleCall}>
+          <Ionicons name="call-outline" size={22} color="#6b7280" />
+          <Text style={styles.bottomActionText}>Call</Text>
+        </TouchableOpacity>
+        
+        <TouchableOpacity style={styles.bottomAction} onPress={handleChat}>
+          <Ionicons name="chatbubble-ellipses-outline" size={22} color="#6b7280" />
+          <Text style={styles.bottomActionText}>Chat</Text>
+        </TouchableOpacity>
+        
+        <TouchableOpacity style={styles.bookBtn} onPress={() => handleLockedAction(() => setBookVisitModalVisible(true))}>
+          <Ionicons name="calendar-outline" size={20} color="#ffffff" style={{ marginRight: 8 }} />
+          <Text style={styles.bookBtnText}>Book Visit</Text>
+        </TouchableOpacity>
+        
+        <TouchableOpacity 
+          style={styles.bottomAction}
+          onPress={() => dispatch({ type: 'hostels/toggleSaveHostel', payload: hostel._id })}
+        >
+          <Ionicons 
+            name={savedHostels.includes(hostel._id) ? "heart" : "heart-outline"} 
+            size={22} 
+            color={savedHostels.includes(hostel._id) ? "#ef4444" : "#6b7280"} 
+          />
+          <Text style={[styles.bottomActionText, savedHostels.includes(hostel._id) && { color: "#ef4444" }]}>Save</Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* Pricing Modal */}
+      <Modal visible={pricingModalVisible} animationType="slide" transparent={true}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            {/* Modal Header */}
+            <View style={styles.modalHeader}>
+              <TouchableOpacity onPress={() => setPricingModalVisible(false)} style={styles.modalCloseBtn}>
+                <Ionicons name="arrow-back" size={24} color="#1f2937" />
+              </TouchableOpacity>
+              <Text style={styles.modalTitle}>Room Types & Pricing</Text>
+              <TouchableOpacity onPress={() => setPricingModalVisible(false)} style={styles.modalCloseBtn}>
+                <Ionicons name="close" size={24} color="#1f2937" />
+              </TouchableOpacity>
+            </View>
+
+            {/* Room List */}
+            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.modalScroll}>
+              {[
+                { type: 'Single Room', price: '14,700', left: 1, id: 'single' },
+                { type: '2 Sharing Room', price: '11,000', left: 5, id: 'sharing2' },
+                { type: '3 Sharing Room', price: '8,800', left: 2, id: 'sharing3' },
+                { type: '4 Sharing Room', price: '7,400', left: 4, id: 'sharing4' },
+                { type: '5 Sharing Room', price: '5,900', left: 3, id: 'sharing5' },
+              ].map((room, idx) => (
+                <TouchableOpacity 
+                  key={idx} 
+                  style={[styles.roomCard, selectedRoom === room.id && styles.roomCardSelected]}
+                  onPress={() => setSelectedRoom(room.id)}
+                  activeOpacity={0.8}
+                >
+                  <View style={styles.roomImageContainer}>
+                    <Image 
+                      source={{ uri: "https://images.unsplash.com/photo-1522771739844-6a9f6d5f14af?auto=format&fit=crop&w=200&q=80" }} 
+                      style={styles.roomImage} 
+                    />
+                  </View>
+                  <View style={styles.roomInfo}>
+                    <Text style={styles.roomType}>{room.type}</Text>
+                    <View style={styles.roomPriceRow}>
+                      <Text style={styles.roomPrice}>₹{room.price}</Text>
+                      <Text style={styles.roomPriceUnit}>/mo</Text>
+                    </View>
+                  </View>
+                  <Text style={styles.vacancyText}>{room.left} Left</Text>
+                </TouchableOpacity>
+              ))}
+              <View style={{ height: 100 }} />
+            </ScrollView>
+
+            {/* Modal Footer */}
+            <View style={styles.modalFooter}>
+              <TouchableOpacity 
+                style={styles.bookNowBtn} 
+                onPress={() => {
+                  setPricingModalVisible(false);
+                  Alert.alert("Success", "Room Selected! You can proceed to Book Visit now.");
+                }}
               >
-                <View style={styles.premiumPriceTop}>
-                  <Text style={styles.premiumPriceIcon}>{p.icon}</Text>
-                  {p.vacancies !== undefined && (
-                    <View style={[styles.vacancyPill, p.vacancies > 0 ? styles.vacancyPillAvailable : styles.vacancyPillFull]}>
-                      <Text style={[styles.vacancyPillText, p.vacancies > 0 ? styles.vacancyPillTextAvailable : styles.vacancyPillTextFull]}>
-                        {p.vacancies > 0 ? `${p.vacancies} Left` : 'Full'}
-                      </Text>
+                <Text style={styles.bookNowText}>Select Room</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Reviews Modal */}
+      <Modal visible={reviewsModalVisible} animationType="slide" transparent={true}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Reviews & Ratings</Text>
+              <TouchableOpacity onPress={() => setReviewsModalVisible(false)} style={styles.modalCloseBtn}>
+                <Ionicons name="close" size={24} color="#1f2937" />
+              </TouchableOpacity>
+            </View>
+            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.modalScroll}>
+              <View style={styles.overallRatingBox}>
+                <View style={styles.overallRatingLeft}>
+                  <Text style={styles.bigRatingNum}>5.0</Text>
+                  <Text style={styles.overallText}>Overall Rating</Text>
+                  <Text style={styles.reviewCountText}>(56 Reviews)</Text>
+                </View>
+                <View style={styles.ratingBars}>
+                  {[5, 4, 3, 2, 1].map((star) => (
+                    <View key={star} style={styles.ratingBarRow}>
+                      <View style={styles.starsGroup}>
+                        <Ionicons name="star" size={12} color="#f59e0b" />
+                      </View>
+                      <View style={styles.barTrack}>
+                        <View style={[styles.barFill, { width: star >= 4 ? '90%' : '10%' }]} />
+                      </View>
+                      <Text style={styles.barValue}>{star === 5 ? '5.0' : star === 4 ? '4.9' : '5.0'}</Text>
+                    </View>
+                  ))}
+                </View>
+              </View>
+
+              <View style={styles.categoryRatings}>
+                {[
+                  { name: 'Food', score: '5.0' },
+                  { name: 'Safety', score: '5.0' },
+                  { name: 'Cleanliness', score: '4.9' },
+                  { name: 'Management', score: '5.0' },
+                  { name: 'Internet', score: '4.8' },
+                ].map(cat => (
+                  <View key={cat.name} style={styles.categoryRow}>
+                    <Text style={styles.categoryName}>{cat.name}</Text>
+                    <Text style={styles.categoryScore}>{cat.score}</Text>
+                  </View>
+                ))}
+              </View>
+
+              <View style={styles.segmentedControl}>
+                {['All', 'Photos', 'Videos'].map(tab => (
+                  <TouchableOpacity 
+                    key={tab} 
+                    style={[styles.segmentTab, activeReviewTab === tab && styles.segmentTabActive]}
+                    onPress={() => setActiveReviewTab(tab)}
+                  >
+                    <Text style={[styles.segmentText, activeReviewTab === tab && styles.segmentTextActive]}>{tab}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              {/* Review Cards */}
+              {displayedReviews.map(review => (
+                <View key={review.id} style={styles.reviewCard}>
+                  <View style={styles.reviewHeader}>
+                    <Image source={{uri: `https://randomuser.me/api/portraits/men/${30 + review.id}.jpg`}} style={styles.reviewerAvatar} />
+                    <View style={styles.reviewerInfo}>
+                      <Text style={styles.reviewerName}>{review.user}</Text>
+                      <Text style={styles.reviewerSub}>{review.sub}</Text>
+                      <Text style={styles.reviewerDate}>{review.date}</Text>
+                    </View>
+                    <Ionicons name="ellipsis-horizontal" size={20} color="#9ca3af" />
+                  </View>
+                  <Text style={styles.reviewContent}>{review.text}</Text>
+                  
+                  {review.photos && review.photos.length > 0 && (
+                    <View style={styles.reviewPhotos}>
+                      {review.photos.map((photo, idx) => (
+                        <Image key={idx} source={{uri: photo}} style={styles.reviewPhoto} />
+                      ))}
+                    </View>
+                  )}
+                  {review.videos && review.videos.length > 0 && (
+                    <View style={styles.reviewPhotos}>
+                      {review.videos.map((vid, idx) => (
+                        <View key={idx} style={[styles.reviewPhoto, { justifyContent: 'center', alignItems: 'center', backgroundColor: '#e5e7eb' }]}>
+                          <Ionicons name="play-circle" size={24} color="#6b7280" />
+                        </View>
+                      ))}
                     </View>
                   )}
                 </View>
-                <Text style={styles.premiumPriceLabel} numberOfLines={1} adjustsFontSizeToFit>{p.label}</Text>
-                <View style={styles.premiumPriceBottom}>
-                  <Text style={styles.premiumPriceVal} numberOfLines={1} adjustsFontSizeToFit>₹{p.val.toLocaleString('en-IN')}</Text>
-                  <Text style={styles.premiumPriceUnit}>/mo</Text>
-                </View>
+              ))}
+
+              {displayedReviews.length === 0 && (
+                <Text style={{ textAlign: 'center', color: '#6b7280', marginTop: 20, marginBottom: 40 }}>No reviews found for this category.</Text>
+              )}
+              <View style={{height: 100}} />
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Book Visit Modal */}
+      <Modal visible={bookVisitModalVisible} animationType="slide" transparent={true}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <TouchableOpacity onPress={() => setBookVisitModalVisible(false)} style={styles.modalCloseBtn}>
+                <Ionicons name="arrow-back" size={24} color="#1f2937" />
               </TouchableOpacity>
-            ))}
-          </View>
-
-          {/* Financials & Fees */}
-          {(hostel.fees?.depositAmount > 0 || hostel.fees?.maintenanceFee > 0 || hostel.fees?.noticePeriodDays > 0) && (
-            <>
-              <Text style={styles.sectionTitle}>💰 Financials & Fees</Text>
-              <View style={styles.feesCard}>
-                <View style={styles.feeRow}>
-                  <Text style={styles.feeLabel}>Security Deposit</Text>
-                  <Text style={styles.feeVal}>
-                    {hostel.fees.depositAmount > 0 ? `₹${hostel.fees.depositAmount.toLocaleString('en-IN')}` : 'None'}
-                  </Text>
-                </View>
-                <View style={styles.feeRow}>
-                  <Text style={styles.feeLabel}>Maintenance Fee (per month)</Text>
-                  <Text style={styles.feeVal}>
-                    {hostel.fees.maintenanceFee > 0 ? `₹${hostel.fees.maintenanceFee.toLocaleString('en-IN')}` : 'Included'}
-                  </Text>
-                </View>
-                <View style={styles.feeRow}>
-                  <Text style={styles.feeLabel}>Notice Period</Text>
-                  <Text style={styles.feeVal}>
-                    {hostel.fees.noticePeriodDays > 0 ? `${hostel.fees.noticePeriodDays} Days` : 'N/A'}
-                  </Text>
-                </View>
-              </View>
-            </>
-          )}
-
-          {/* Distance Card */}
-          <View style={styles.distanceCard}>
-            <Text style={styles.distanceTitle}>🏫 Campus Distance</Text>
-            <Text style={styles.distanceKm}>{getDistanceKm()} km from nearby campus</Text>
-            <View style={styles.distanceRow}>
-              <View style={styles.distanceItem}>
-                <Text style={styles.distanceIcon}>🚶</Text>
-                <Text style={styles.distanceName}>Walk</Text>
-                <Text style={styles.distanceDuration}>{Math.max(1, Math.round(getDistanceKm() * 12))} min</Text>
-              </View>
-              <View style={styles.distanceDivider} />
-              <View style={styles.distanceItem}>
-                <Text style={styles.distanceIcon}>🛺</Text>
-                <Text style={styles.distanceName}>Auto</Text>
-                <Text style={styles.distanceDuration}>{Math.max(2, Math.round(getDistanceKm() * 3))} min</Text>
-              </View>
-              <View style={styles.distanceDivider} />
-              <View style={styles.distanceItem}>
-                <Text style={styles.distanceIcon}>🚌</Text>
-                <Text style={styles.distanceName}>Bus</Text>
-                <Text style={styles.distanceDuration}>{Math.max(5, Math.round(getDistanceKm() * 5))} min</Text>
-              </View>
+              <Text style={styles.modalTitle}>Book Visit</Text>
+              <TouchableOpacity onPress={() => setBookVisitModalVisible(false)} style={styles.modalCloseBtn}>
+                <Ionicons name="close" size={24} color="#ffffff" />
+              </TouchableOpacity>
             </View>
-          </View>
-
-          {/* Food Gallery */}
-          {allFoodPhotos.length > 0 && (
-            <>
-              <Text style={styles.sectionTitle}>🍽️ Food & Dining Area</Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 20 }}>
-                {allFoodPhotos.map((photo, i) => (
-                  <TouchableOpacity key={i} onPress={() => { /* Option to expand if needed */ }}>
-                    <Image source={{ uri: photo }} style={{ width: 120, height: 100, borderRadius: 12, marginRight: 10 }} />
-                  </TouchableOpacity>
-                ))}
-              </ScrollView>
-            </>
-          )}
-
-          {/* House Rules */}
-          {hostel.rules && (
-            <>
-              <Text style={styles.sectionTitle}>📜 House Rules & Policies</Text>
-              <View style={styles.rulesGrid}>
-                <View style={styles.ruleItem}>
-                  <Text style={styles.ruleIcon}>🕒</Text>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.ruleLabel}>Curfew Time</Text>
-                    <Text style={styles.ruleVal} numberOfLines={1}>{hostel.rules.curfewTime || 'No curfew'}</Text>
-                  </View>
+            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.modalScroll}>
+              <Text style={styles.formLabel}>Select Date</Text>
+              
+              <View style={styles.calendarMock}>
+                <View style={styles.calendarHeader}>
+                  <Text style={styles.calendarMonth}>May 2024</Text>
+                  <Ionicons name="chevron-forward" size={20} color="#1f2937" />
                 </View>
-                <View style={styles.ruleItem}>
-                  <Text style={styles.ruleIcon}>{hostel.rules.visitorsAllowed ? '✅' : '🚫'}</Text>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.ruleLabel}>Visitors</Text>
-                    <Text style={[styles.ruleVal, !hostel.rules.visitorsAllowed && styles.ruleValDisabled]} numberOfLines={1}>
-                      {hostel.rules.visitorsAllowed ? 'Allowed' : 'Not Allowed'}
-                    </Text>
-                  </View>
+                <View style={styles.calendarWeek}>
+                  {['M', 'T', 'W', 'T', 'F', 'S', 'S'].map((d, i) => <Text key={i} style={styles.calDayName}>{d}</Text>)}
                 </View>
-                <View style={styles.ruleItem}>
-                  <Text style={styles.ruleIcon}>{hostel.rules.smokingAllowed ? '🚬' : '🚭'}</Text>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.ruleLabel}>Smoking</Text>
-                    <Text style={[styles.ruleVal, !hostel.rules.smokingAllowed && styles.ruleValDisabled]} numberOfLines={1}>
-                      {hostel.rules.smokingAllowed ? 'Allowed' : 'Not Allowed'}
-                    </Text>
-                  </View>
-                </View>
-                <View style={styles.ruleItem}>
-                  <Text style={styles.ruleIcon}>{hostel.rules.drinkingAllowed ? '🍻' : '🚱'}</Text>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.ruleLabel}>Drinking</Text>
-                    <Text style={[styles.ruleVal, !hostel.rules.drinkingAllowed && styles.ruleValDisabled]} numberOfLines={1}>
-                      {hostel.rules.drinkingAllowed ? 'Allowed' : 'Not Allowed'}
-                    </Text>
-                  </View>
-                </View>
-              </View>
-            </>
-          )}
-
-          {/* Amenities */}
-          <Text style={styles.sectionTitle}>✅ Amenities</Text>
-          <View style={styles.amenitiesGrid}>
-            {hostel.amenities?.length > 0 ? hostel.amenities.map((a, i) => (
-              <View key={i} style={styles.amenityPill}>
-                <Text style={styles.amenityCheck}>✓</Text>
-                <Text style={styles.amenityText}>{a}</Text>
-              </View>
-            )) : (
-              <Text style={styles.noDataText}>No amenities listed.</Text>
-            )}
-          </View>
-
-          {/* Booking Enquiry Box */}
-          <View style={styles.bookingBox}>
-            <Text style={styles.bookingTitle}>📋 Book a Visit</Text>
-            {enquirySuccess ? (
-              <View style={styles.successBox}>
-                <Text style={styles.successIcon}>🎉</Text>
-                <Text style={styles.successTitle}>Visit Request Sent!</Text>
-                <Text style={styles.successText}>Owner: {hostel.ownerName}</Text>
-                <Text style={styles.successText}>Phone: {hostel.phone}</Text>
-                <TouchableOpacity style={styles.chatSuccessBtn} onPress={handleChatPress}>
-                  <Text style={styles.chatSuccessBtnText}>💬 Continue Chat</Text>
-                </TouchableOpacity>
-              </View>
-            ) : (
-              <View>
-                {/* Room Type Selector */}
-                <Text style={styles.bookingLabel}>Room Type</Text>
-                <View style={styles.roomTypeRow}>
-                  {ROOM_TYPES.map(rt => (
-                    <TouchableOpacity
-                      key={rt.id}
-                      style={[styles.roomTypeBtn, selectedRoomType === rt.id && styles.roomTypeBtnActive]}
-                      onPress={() => setSelectedRoomType(rt.id)}
-                    >
-                      <Text style={[styles.roomTypeBtnText, selectedRoomType === rt.id && styles.roomTypeBtnTextActive]}>
-                        {rt.label}
-                      </Text>
-                    </TouchableOpacity>
+                <View style={styles.calendarGrid}>
+                  {[
+                    ['', '', 1, 2, 3, 4, 5],
+                    [6, 7, 8, 9, 10, 11, 12],
+                    [13, 14, 15, 16, 17, 18, 19],
+                    [20, 21, 22, 23, 24, 25, 26],
+                    [27, 28, 29, 30, 31, '', '']
+                  ].map((row, rIdx) => (
+                    <View key={rIdx} style={styles.calRow}>
+                      {row.map((day, dIdx) => (
+                        <TouchableOpacity 
+                          key={dIdx} 
+                          style={styles.calCell}
+                          onPress={() => { if(day) setSelectedDate(day) }}
+                          disabled={!day}
+                        >
+                          <View style={[styles.calDayOuter, selectedDate === day && styles.calDayActiveOuter]}>
+                            <Text style={[styles.calDayNum, selectedDate === day && styles.calDayNumActive, (day === 3 || day === 11) && {color: '#4F46E5', fontWeight: 'bold'}]}>
+                              {day}
+                            </Text>
+                          </View>
+                          {(day === 3 || day === 11) && <View style={styles.calDot} />}
+                        </TouchableOpacity>
+                      ))}
+                    </View>
                   ))}
                 </View>
+              </View>
 
-                {/* Move-in Date */}
-                <Text style={styles.bookingLabel}>Preferred Move-in Date</Text>
-                <TouchableOpacity style={styles.datePickerBtn} onPress={() => setDatePickerVisible(true)}>
-                  <Text style={styles.datePickerIcon}>📅</Text>
-                  <Text style={styles.datePickerText}>
-                    {moveInDate
-                      ? `${moveInDate.getDate()} ${MONTHS[moveInDate.getMonth()]} ${moveInDate.getFullYear()}`
-                      : 'Select a date (optional)'
-                    }
-                  </Text>
-                  {moveInDate && (
-                    <TouchableOpacity onPress={() => setMoveInDate(null)}>
-                      <Text style={styles.dateClearBtn}>✕</Text>
-                    </TouchableOpacity>
-                  )}
-                </TouchableOpacity>
+              <Text style={styles.formLabel}>Select Time Slot</Text>
+              <View style={styles.timeSlotsRow}>
+                {['10:00 AM', '12:00 PM', '04:00 PM', '06:00 PM'].map(time => (
+                  <TouchableOpacity 
+                    key={time}
+                    style={[styles.timeSlot, selectedTimeSlot === time && styles.timeSlotActive]}
+                    onPress={() => setSelectedTimeSlot(time)}
+                  >
+                    <Text style={[styles.timeSlotText, selectedTimeSlot === time && styles.timeSlotTextActive]}>{time}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
 
-                {/* Message */}
-                <Text style={styles.bookingLabel}>Message to Owner</Text>
+              <Text style={styles.formLabel}>Message to Owner (Optional)</Text>
+              <View style={[styles.textAreaContainer, { padding: 0 }]}>
                 <TextInput
-                  value={enquiryMessage}
-                  onChangeText={setEnquiryMessage}
+                  style={[{ flex: 1, padding: 16, color: '#1f2937', textAlignVertical: 'top' }]}
+                  placeholder="I am interested in this hostel. Please share more details."
+                  placeholderTextColor="#9ca3af"
                   multiline
-                  numberOfLines={3}
-                  style={styles.messageInput}
-                  placeholderTextColor="#878787"
+                  numberOfLines={4}
+                  value={messageToOwner}
+                  onChangeText={setMessageToOwner}
                 />
-
-                <TouchableOpacity
-                  style={styles.btnBook}
-                  onPress={() => requireUnlock(handleEnquirySubmit)}
-                  disabled={enquirySubmitting}
-                >
-                  {enquirySubmitting
-                    ? <ActivityIndicator color="#fff" />
-                    : <Text style={styles.btnBookText}>{localUnlocked ? '✅ Submit Visit Request' : '🔒 Pay ₹5 to Unlock & Submit'}</Text>
-                  }
-                </TouchableOpacity>
               </View>
-            )}
+
+              <View style={{height: 100}} />
+            </ScrollView>
+
+            <View style={styles.modalFooter}>
+              <TouchableOpacity 
+                style={styles.bookNowBtn} 
+                onPress={() => handleLockedAction(() => {
+                  let roomTypeStr = 'Not specified';
+                  if (selectedRoom === 'single') roomTypeStr = 'Single Room';
+                  else if (selectedRoom === 'sharing2') roomTypeStr = '2 Sharing Room';
+                  else if (selectedRoom === 'sharing3') roomTypeStr = '3 Sharing Room';
+                  else if (selectedRoom === 'sharing4') roomTypeStr = '4 Sharing Room';
+                  else if (selectedRoom === 'sharing5') roomTypeStr = '5 Sharing Room';
+
+                  dispatch({ 
+                    type: 'bookings/bookVisit', 
+                    payload: { 
+                      hostelId: hostel._id, 
+                      hostelName: hostel.name, 
+                      date: `May ${selectedDate}, 2024`, 
+                      time: selectedTimeSlot, 
+                      roomType: roomTypeStr,
+                      message: messageToOwner
+                    } 
+                  });
+                  
+                  // Dispatch a real Notification
+                  dispatch(addNotification({
+                    _id: Date.now().toString(),
+                    icon: 'calendar-outline',
+                    iconBg: '#eff6ff',
+                    iconColor: '#3b82f6',
+                    title: 'Visit Booked',
+                    subtitle: `Visit confirmed at ${hostel.name} on May ${selectedDate}`,
+                    time: 'Just now',
+                    read: false
+                  }));
+
+                  setBookVisitModalVisible(false);
+                  Alert.alert("Visit Booked! 🎉", `Your visit to ${hostel.name} has been confirmed for May ${selectedDate} at ${selectedTimeSlot}`);
+                })}
+              >
+                <Text style={styles.bookNowText}>Confirm Visit</Text>
+              </TouchableOpacity>
+            </View>
           </View>
+        </View>
+      </Modal>
 
-          {/* Reviews Section */}
-          <Text style={styles.sectionTitle}>⭐ Student Reviews ({reviews.length})</Text>
-
-          {isAuthenticated && user?.role === 'student' && (
-            <View style={styles.writeReviewBox}>
-              <Text style={styles.writeReviewTitle}>Write a Review</Text>
-              <View style={styles.starsRow}>
-                {[1, 2, 3, 4, 5].map(s => (
-                  <TouchableOpacity key={s} onPress={() => setUserRating(s)}>
-                    <Text style={[styles.starIcon, s <= userRating && styles.starIconActive]}>★</Text>
-                  </TouchableOpacity>
-                ))}
-                <Text style={styles.ratingLabel}>{userRating}/5 Overall</Text>
+      {/* Paywall Modal */}
+      <Modal visible={paywallModalVisible} animationType="fade" transparent={true}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={{ alignItems: 'center', paddingVertical: 20 }}>
+              <View style={{ width: 60, height: 60, borderRadius: 30, backgroundColor: '#fef2f2', alignItems: 'center', justifyContent: 'center', marginBottom: 16 }}>
+                <Ionicons name="lock-closed" size={30} color="#ef4444" />
               </View>
+              <Text style={{ fontSize: 20, fontWeight: 'bold', color: '#111827', textAlign: 'center', marginBottom: 8 }}>
+                Unlock Contact Details
+              </Text>
+              <Text style={{ fontSize: 14, color: '#6b7280', textAlign: 'center', marginBottom: 24, paddingHorizontal: 20 }}>
+                Pay a one-time fee of ₹1 to unlock Call, Chat, and Visit Booking for all hostels on HostelSathi.
+              </Text>
 
-              <View style={styles.starsRow}>
-                {[1, 2, 3, 4, 5].map(s => (
-                  <TouchableOpacity key={s} onPress={() => setUserSafetyScore(s)}>
-                    <Text style={[styles.starIcon, s <= userSafetyScore && { color: '#10b981' }]}>🛡️</Text>
-                  </TouchableOpacity>
-                ))}
-                <Text style={styles.ratingLabel}>{userSafetyScore}/5 Safety</Text>
-              </View>
-
-              <View style={styles.starsRow}>
-                {[1, 2, 3, 4, 5].map(s => (
-                  <TouchableOpacity key={s} onPress={() => setUserFoodRating(s)}>
-                    <Text style={[styles.starIcon, s <= userFoodRating && { color: '#f59e0b' }]}>🍽️</Text>
-                  </TouchableOpacity>
-                ))}
-                <Text style={styles.ratingLabel}>{userFoodRating}/5 Food</Text>
-              </View>
-
-              <TextInput
-                placeholder="Share your experience — food, safety, management..."
-                value={userComment}
-                onChangeText={setUserComment}
-                style={styles.commentInput}
-                multiline
-                placeholderTextColor="#878787"
+              <Image 
+                source={{ uri: 'https://upload.wikimedia.org/wikipedia/commons/d/d0/QR_code_for_mobile_English_Wikipedia.svg' }} 
+                style={{ width: 200, height: 200, marginBottom: 16 }}
               />
-              <TouchableOpacity
-                style={styles.btnSubmitReview}
-                onPress={handleReviewSubmit}
-                disabled={reviewSubmitting}
-              >
-                {reviewSubmitting
-                  ? <ActivityIndicator color="#fff" size="small" />
-                  : <Text style={styles.btnSubmitReviewText}>Submit Review</Text>
-                }
-              </TouchableOpacity>
-            </View>
-          )}
+              <Text style={{ fontSize: 14, fontWeight: 'bold', color: '#374151', marginBottom: 30 }}>UPI: hostelsathi@ybl</Text>
 
-          {reviews.length > 0 ? reviews.map(r => (
-            <View key={r._id} style={styles.reviewItem}>
-              <View style={styles.reviewHeader}>
-                <View style={styles.reviewAvatar}>
-                  <Text style={styles.reviewAvatarText}>{r.userName.charAt(0).toUpperCase()}</Text>
+              {verifyingScreenshot ? (
+                <View style={{ alignItems: 'center', paddingVertical: 10 }}>
+                  <ActivityIndicator size="large" color="#4F46E5" />
+                  <Text style={{ marginTop: 12, color: '#4F46E5', fontWeight: '500' }}>Checking for duplicate/fake receipt...</Text>
                 </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.reviewUser}>{r.userName}</Text>
-                  <Text style={styles.reviewDate}>
-                    {new Date(r.createdAt).toLocaleDateString('en-IN', { month: 'short', year: 'numeric' })}
-                  </Text>
-                </View>
-                <View style={styles.reviewStarsBox}>
-                  <Text style={styles.reviewStars}>{'★'.repeat(r.rating)}{'☆'.repeat(5 - r.rating)}</Text>
-                </View>
-              </View>
-              <Text style={styles.reviewComment}>{r.comment}</Text>
+              ) : (
+                <>
+                  <TouchableOpacity 
+                    style={[styles.bookNowBtn, { width: '100%', marginBottom: 12 }]} 
+                    onPress={handleUploadScreenshot}
+                  >
+                    <Ionicons name="cloud-upload-outline" size={20} color="#fff" style={{ marginRight: 8 }} />
+                    <Text style={styles.bookNowText}>Upload Screenshot</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity 
+                    style={{ paddingVertical: 12, width: '100%', alignItems: 'center' }} 
+                    onPress={() => {
+                      setPaywallModalVisible(false);
+                      setPendingAction(null);
+                    }}
+                  >
+                    <Text style={{ color: '#6b7280', fontWeight: '600' }}>Cancel</Text>
+                  </TouchableOpacity>
+                </>
+              )}
             </View>
-          )) : (
-            <View style={styles.noReviewsBox}>
-              <Text style={styles.noReviewsText}>Be the first to review this hostel!</Text>
-            </View>
-          )}
-        </View>
-      </ScrollView>
-
-      {/* Full-screen Photo Gallery Modal */}
-      <Modal visible={galleryVisible} transparent animationType="fade">
-        <View style={styles.galleryModal}>
-          <TouchableOpacity style={styles.galleryClose} onPress={() => setGalleryVisible(false)}>
-            <Text style={styles.galleryCloseText}>✕</Text>
-          </TouchableOpacity>
-          <Text style={styles.galleryCounter}>{galleryIndex + 1} / {allPhotos.length}</Text>
-          <ScrollView
-            horizontal
-            pagingEnabled
-            showsHorizontalScrollIndicator={false}
-            contentOffset={{ x: galleryIndex * SCREEN_WIDTH, y: 0 }}
-            onScroll={e => {
-              const i = Math.round(e.nativeEvent.contentOffset.x / SCREEN_WIDTH);
-              setGalleryIndex(i);
-            }}
-            scrollEventThrottle={16}
-          >
-            {allPhotos.map((photo, i) => (
-              <View key={i} style={styles.gallerySlide}>
-                <Image source={{ uri: photo }} style={styles.galleryImage} resizeMode="contain" />
-              </View>
-            ))}
-          </ScrollView>
-        </View>
-      </Modal>
-
-      {/* Payment Paywall Modal */}
-      <Modal
-        visible={paymentModalVisible}
-        transparent
-        animationType="slide"
-        onRequestClose={() => {
-          if (!processingPayment) {
-            setPaymentModalVisible(false);
-            setPaymentStep('initial');
-          }
-        }}
-      >
-        <View style={styles.paymentModalOverlay}>
-          <View style={styles.paymentModal}>
-            {paymentStep === 'initial' ? (
-              <>
-                <Text style={styles.paymentModalIcon}>💳</Text>
-                <Text style={styles.paymentModalTitle}>Unlock Contact Details</Text>
-                <Text style={styles.paymentModalDesc}>
-                  Pay just <Text style={{ fontWeight: 'bold', color: '#2874f0' }}>₹5</Text> to instantly unlock the owner's phone number, WhatsApp, Map location, and Chat feature.
-                </Text>
-                <View style={styles.paymentActionRow}>
-                  <TouchableOpacity style={styles.payBtn} onPress={handleInitialPayClick}>
-                    <Text style={styles.payBtnText}>Pay ₹5</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={styles.payCancelBtn} onPress={() => { setPaymentModalVisible(false); setPaymentStep('initial'); }}>
-                    <Text style={styles.payCancelText}>Cancel</Text>
-                  </TouchableOpacity>
-                </View>
-              </>
-            ) : (
-              <>
-                <Text style={styles.paymentModalTitle}>Scan to Unlock</Text>
-                <Text style={styles.paymentModalDesc}>
-                  Scan and pay exactly <Text style={{ fontWeight: 'bold', color: '#2874f0' }}>₹5.00</Text>. Then upload the payment success screenshot.
-                </Text>
-
-                <Image
-                  source={{ uri: `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent('upi://pay?pa=hostelsathi@ybl&pn=HostelSathi&am=5.00&cu=INR')}` }}
-                  style={styles.qrCodeImage}
-                />
-
-                {processingPayment ? (
-                  <View style={styles.paymentProcessing}>
-                    <ActivityIndicator size="large" color="#2874f0" />
-                    <Text style={styles.paymentProcessingText}>AI is verifying your screenshot...</Text>
-                  </View>
-                ) : (
-                  <View style={styles.paymentActionRow}>
-                    <TouchableOpacity style={styles.uploadBtn} onPress={handleUploadScreenshot}>
-                      <Text style={styles.payBtnText}>Upload Screenshot</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity style={styles.payCancelBtn} onPress={() => { setPaymentModalVisible(false); setPaymentStep('initial'); }}>
-                      <Text style={styles.payCancelText}>Cancel</Text>
-                    </TouchableOpacity>
-                  </View>
-                )}
-              </>
-            )}
-          </View>
-        </View>
-      </Modal>
-
-      {/* Date Picker Modal */}
-      <Modal visible={datePickerVisible} transparent animationType="slide">
-        <View style={styles.dateModalOverlay}>
-          <View style={styles.dateModal}>
-            <Text style={styles.dateModalTitle}>Select Move-in Date</Text>
-            {/* Month Navigator */}
-            <View style={styles.monthNav}>
-              <TouchableOpacity
-                onPress={() => {
-                  if (pickerMonth === 0) { setPickerMonth(11); setPickerYear(pickerYear - 1); }
-                  else setPickerMonth(pickerMonth - 1);
-                }}
-              >
-                <Text style={styles.monthNavArrow}>‹</Text>
-              </TouchableOpacity>
-              <Text style={styles.monthLabel}>{MONTHS[pickerMonth]} {pickerYear}</Text>
-              <TouchableOpacity
-                onPress={() => {
-                  if (pickerMonth === 11) { setPickerMonth(0); setPickerYear(pickerYear + 1); }
-                  else setPickerMonth(pickerMonth + 1);
-                }}
-              >
-                <Text style={styles.monthNavArrow}>›</Text>
-              </TouchableOpacity>
-            </View>
-            {/* Day Headers */}
-            <View style={styles.dayHeaders}>
-              {['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'].map(d => (
-                <Text key={d} style={styles.dayHeader}>{d}</Text>
-              ))}
-            </View>
-            {/* Calendar Grid */}
-            <View style={styles.calendarGrid}>
-              {renderCalendar()}
-            </View>
-            <TouchableOpacity
-              style={styles.dateModalClose}
-              onPress={() => setDatePickerVisible(false)}
-            >
-              <Text style={styles.dateModalCloseText}>Cancel</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
-
-      {/* Join & Pay Rent Modal */}
-      <Modal
-        visible={joinModalVisible}
-        transparent
-        animationType="slide"
-        onRequestClose={() => {
-          if (!processingJoin) {
-            setJoinModalVisible(false);
-            setJoinStep('initial');
-          }
-        }}
-      >
-        <View style={styles.paymentModalOverlay}>
-          <View style={styles.paymentModal}>
-            {processingJoin ? (
-              <View style={styles.paymentProcessing}>
-                <ActivityIndicator size="large" color="#10b981" />
-                <Text style={[styles.paymentProcessingText, { color: '#10b981' }]}>Verifying rent payment with AI...</Text>
-              </View>
-            ) : joinStep === 'initial' ? (
-              <>
-                <Text style={styles.paymentModalIcon}>🏠</Text>
-                <Text style={styles.paymentModalTitle}>Join {hostel?.name}</Text>
-                <Text style={styles.paymentModalDesc}>
-                  Secure your room by paying the rent directly to the owner via UPI. We will automatically verify your payment!
-                </Text>
-                <View style={styles.paymentActionRow}>
-                  <TouchableOpacity style={[styles.payBtn, { backgroundColor: '#10b981' }]} onPress={() => setJoinStep('qr')}>
-                    <Text style={styles.payBtnText}>Proceed to Pay Rent</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={styles.payCancelBtn} onPress={() => setJoinModalVisible(false)}>
-                    <Text style={styles.payCancelText}>Cancel</Text>
-                  </TouchableOpacity>
-                </View>
-              </>
-            ) : (
-              <>
-                <Text style={[styles.paymentModalTitle, { fontSize: 18, marginBottom: 5 }]}>Owner's UPI QR Code</Text>
-                <Text style={[styles.paymentModalDesc, { marginBottom: 15 }]}>
-                  Scan this code to pay the rent to: {hostel?.paymentUpiId}
-                </Text>
-                <Image
-                  source={{ uri: `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=upi://pay?pa=${hostel?.paymentUpiId}&pn=${hostel?.ownerName}&cu=INR` }}
-                  style={styles.qrCodeImage}
-                />
-                <View style={styles.paymentActionRow}>
-                  <TouchableOpacity style={styles.uploadBtn} onPress={handleUploadJoinScreenshot}>
-                    <Text style={styles.payBtnText}>📸 Upload Success Screenshot</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={styles.payCancelBtn} onPress={() => setJoinStep('initial')}>
-                    <Text style={styles.payCancelText}>Go Back</Text>
-                  </TouchableOpacity>
-                </View>
-              </>
-            )}
           </View>
         </View>
       </Modal>
@@ -1024,444 +766,494 @@ export default function HostelDetailScreen({ route, navigation }) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f1f3f6' },
-  scrollContent: { paddingBottom: 40 },
-  loadingBox: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 12 },
-  loadingText: { color: '#878787', fontSize: 14 },
-  emptyBox: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  emptyText: { color: '#878787', fontSize: 14 },
-  // Gallery
-  galleryHero: { position: 'relative' },
-  heroImage: { width: SCREEN_WIDTH, height: 260 },
-  photoIndicators: {
-    position: 'absolute',
-    bottom: 16,
-    left: 0,
-    right: 0,
-    flexDirection: 'row',
+  container: {
+    flex: 1,
+    backgroundColor: '#ffffff',
+  },
+  centerBox: {
+    flex: 1,
     justifyContent: 'center',
-    gap: 6
+    alignItems: 'center',
+    backgroundColor: '#ffffff',
   },
-  photoIndicatorDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: 'rgba(255,255,255,0.5)' },
-  photoIndicatorDotActive: { backgroundColor: '#ffffff', width: 18 },
-  photoCountBadge: {
+  imageContainer: {
+    width: '100%',
+    height: 300,
+    position: 'relative',
+  },
+  heroImage: {
+    width: SCREEN_WIDTH,
+    height: 300,
+  },
+  topActionsRow: {
     position: 'absolute',
-    top: 12,
-    right: 12,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    borderRadius: 12,
-    paddingVertical: 4,
-    paddingHorizontal: 10
-  },
-  photoCountText: { color: '#ffffff', fontSize: 12, fontWeight: '600' },
-  heroBadges: {
-    position: 'absolute',
-    top: 12,
-    left: 12,
-    flexDirection: 'row',
-    gap: 6
-  },
-  heroBadgePremium: {
-    backgroundColor: '#f59e0b',
-    borderRadius: 6,
-    paddingVertical: 4,
-    paddingHorizontal: 8
-  },
-  heroBadgeVerified: {
-    backgroundColor: '#10b981',
-    borderRadius: 6,
-    paddingVertical: 4,
-    paddingHorizontal: 8
-  },
-  heroBadgeText: { color: '#ffffff', fontSize: 10, fontWeight: 'bold' },
-  // Content
-  contentCard: {
-    backgroundColor: '#ffffff',
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    marginTop: -20,
-    padding: 20
-  },
-  titleRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 },
-  hostelName: { fontSize: 22, fontWeight: 'bold', color: '#212121', marginBottom: 4 },
-  hostelAddress: { fontSize: 13, color: '#878787', lineHeight: 18 },
-  ratingPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#fef3c7',
-    borderRadius: 10,
-    paddingVertical: 6,
-    paddingHorizontal: 10,
-    gap: 3,
-    alignSelf: 'flex-start'
-  },
-  ratingStarIcon: { color: '#f59e0b', fontSize: 14 },
-  ratingValue: { color: '#d97706', fontSize: 14, fontWeight: 'bold' },
-  ratingCount: { color: '#d97706', fontSize: 11 },
-  infoPillsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 12 },
-  infoPill: {
-    backgroundColor: '#f0ecfd',
-    paddingVertical: 6,
-    paddingHorizontal: 10,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: 'rgba(124,58,237,0.12)'
-  },
-  infoPillText: { fontSize: 12, color: '#5f5a75', fontWeight: '600' },
-  collegesRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 6, marginBottom: 16, paddingBottom: 16, borderBottomWidth: 1, borderBottomColor: 'rgba(124,58,237,0.08)' },
-  collegesLabel: { fontSize: 12, color: '#2874f0', fontWeight: 'bold', flexShrink: 0 },
-  collegesText: { fontSize: 12, color: '#5f5a75', flex: 1, lineHeight: 18 },
-  actionBtns: { flexDirection: 'row', gap: 10, marginBottom: 20 },
-  actionBtnChat: {
-    flex: 1,
-    backgroundColor: '#2874f0',
-    paddingVertical: 13,
-    borderRadius: 12,
-    alignItems: 'center'
-  },
-  actionBtnChatText: { color: '#ffffff', fontWeight: 'bold', fontSize: 14 },
-  actionBtnMap: {
-    width: 68,
-    backgroundColor: '#ede9fe',
-    paddingVertical: 13,
-    borderRadius: 12,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#c4b5fd'
-  },
-  actionBtnMapText: { color: '#2874f0', fontWeight: 'bold', fontSize: 13 },
-  actionBtnCall: {
-    width: 68,
-    backgroundColor: '#ecfdf5',
-    paddingVertical: 13,
-    borderRadius: 12,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#10b981'
-  },
-  actionBtnCallText: { color: '#059669', fontWeight: 'bold', fontSize: 14 },
-  whatsappBtn: {
-    backgroundColor: '#f0fdf4',
-    borderWidth: 1,
-    borderColor: '#4ade80',
-    paddingVertical: 12,
-    borderRadius: 12,
-    alignItems: 'center',
-    marginBottom: 16
-  },
-  whatsappBtnText: { color: '#15803d', fontWeight: 'bold', fontSize: 13 },
-  sectionTitle: { fontSize: 16, fontWeight: 'bold', color: '#212121', marginTop: 20, marginBottom: 12 },
-
-  // Premium Pricing Cards
-  pricingList: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, justifyContent: 'space-between', marginBottom: 16 },
-  premiumPriceCard: {
-    width: '48%',
-    backgroundColor: '#ffffff',
-    borderRadius: 16,
-    padding: 14,
-    borderWidth: 2,
-    borderColor: 'rgba(124,58,237,0.06)',
-    shadowColor: '#2874f0',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.04,
-    shadowRadius: 8,
-    elevation: 2,
-    marginBottom: 4
-  },
-  premiumPriceCardSelected: { borderColor: '#2874f0', backgroundColor: '#faf8ff' },
-  premiumPriceTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 },
-  premiumPriceIcon: { fontSize: 20 },
-  premiumPriceLabel: { fontSize: 13, fontWeight: 'bold', color: '#212121', marginBottom: 4 },
-  vacancyPill: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 8 },
-  vacancyPillAvailable: { backgroundColor: '#d1fae5' },
-  vacancyPillFull: { backgroundColor: '#fee2e2' },
-  vacancyPillText: { fontSize: 9, fontWeight: 'bold' },
-  vacancyPillTextAvailable: { color: '#059669' },
-  vacancyPillTextFull: { color: '#dc2626' },
-  premiumPriceBottom: { flexDirection: 'row', alignItems: 'flex-end', gap: 2 },
-  premiumPriceVal: { fontSize: 16, fontWeight: '900', color: '#2874f0' },
-  premiumPriceUnit: { fontSize: 11, color: '#878787', marginBottom: 2 },
-
-  distanceCard: {
-    backgroundColor: 'rgba(124,58,237,0.03)',
-    borderWidth: 1,
-    borderColor: 'rgba(124,58,237,0.1)',
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 16
-  },
-  distanceTitle: { fontSize: 14, fontWeight: 'bold', color: '#212121', marginBottom: 4 },
-  distanceKm: { fontSize: 12, color: '#878787', marginBottom: 12 },
-  distanceRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  distanceItem: { alignItems: 'center', flex: 1 },
-  distanceIcon: { fontSize: 20, marginBottom: 4 },
-  distanceName: { fontSize: 11, color: '#5f5a75', fontWeight: '600' },
-  distanceDuration: { fontSize: 10, color: '#878787', marginTop: 2 },
-  distanceDivider: { width: 1, height: 30, backgroundColor: 'rgba(124,58,237,0.1)' },
-  amenitiesGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 20 },
-  amenityPill: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#f1f3f6', paddingVertical: 8, paddingHorizontal: 12, borderRadius: 8, borderWidth: 1, borderColor: 'rgba(124,58,237,0.08)' },
-  amenityCheck: { color: '#10b981', fontWeight: 'bold', fontSize: 12 },
-  amenityText: { fontSize: 12, color: '#212121', fontWeight: '500' },
-  noDataText: { fontSize: 13, color: '#878787', fontStyle: 'italic' },
-  // Fees
-  feesCard: {
-    backgroundColor: '#faf8ff',
-    borderRadius: 12,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: 'rgba(124,58,237,0.1)',
-    marginBottom: 16
-  },
-  feeRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 },
-  feeLabel: { fontSize: 13, color: '#5f5a75' },
-  feeVal: { fontSize: 14, fontWeight: 'bold', color: '#212121' },
-  // Rules
-  rulesGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 12,
-    marginBottom: 16
-  },
-  ruleItem: {
-    width: '48%',
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#ffffff',
-    borderRadius: 12,
-    padding: 12,
-    borderWidth: 1,
-    borderColor: 'rgba(124,58,237,0.08)',
-    gap: 10
-  },
-  ruleIcon: { fontSize: 20 },
-  ruleLabel: { fontSize: 11, color: '#878787' },
-  ruleVal: { fontSize: 13, fontWeight: 'bold', color: '#212121' },
-  ruleValDisabled: { color: '#ef4444' },
-  bookingBox: {
-    borderColor: 'rgba(124,58,237,0.15)',
-    borderRadius: 14,
-    padding: 16,
-    marginBottom: 16
-  },
-  distanceTitle: { fontSize: 13, fontWeight: 'bold', color: '#212121', marginBottom: 4 },
-  distanceKm: { fontSize: 11, color: '#5f5a75', marginBottom: 12 },
-  distanceRow: { flexDirection: 'row', justifyContent: 'space-around' },
-  distanceItem: { alignItems: 'center', flex: 1 },
-  distanceIcon: { fontSize: 22, marginBottom: 4 },
-  distanceName: { fontSize: 11, color: '#878787' },
-  distanceDuration: { fontSize: 13, fontWeight: 'bold', color: '#2874f0' },
-  distanceDivider: { width: 1, backgroundColor: 'rgba(124,58,237,0.15)' },
-  amenitiesGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 16 },
-  amenityPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#f0fcf6',
-    borderWidth: 1,
-    borderColor: 'rgba(16,185,129,0.2)',
-    paddingVertical: 6,
-    paddingHorizontal: 10,
-    borderRadius: 20,
-    gap: 5
-  },
-  amenityCheck: { color: '#10b981', fontWeight: 'bold', fontSize: 12 },
-  amenityText: { fontSize: 12, color: '#059669', fontWeight: '600' },
-  noDataText: { color: '#878787', fontSize: 13, paddingVertical: 8 },
-  bookingBox: {
-    borderWidth: 2,
-    borderColor: 'rgba(124,58,237,0.2)',
-    borderRadius: 16,
-    padding: 16,
-    marginTop: 16,
-    backgroundColor: 'rgba(124,58,237,0.01)'
-  },
-  bookingTitle: { fontSize: 16, fontWeight: 'bold', color: '#212121', marginBottom: 14 },
-  bookingLabel: { fontSize: 12, fontWeight: 'bold', color: '#5f5a75', marginBottom: 8, marginTop: 12 },
-  roomTypeRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  roomTypeBtn: {
-    paddingVertical: 7,
-    paddingHorizontal: 14,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: 'rgba(124,58,237,0.2)',
-    backgroundColor: '#f1f3f6'
-  },
-  roomTypeBtnActive: { backgroundColor: '#2874f0', borderColor: '#2874f0' },
-  roomTypeBtnText: { fontSize: 12, color: '#5f5a75', fontWeight: '600' },
-  roomTypeBtnTextActive: { color: '#ffffff' },
-  datePickerBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#f1f3f6',
-    borderWidth: 1,
-    borderColor: 'rgba(124,58,237,0.2)',
-    borderRadius: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    gap: 10
-  },
-  datePickerIcon: { fontSize: 16 },
-  datePickerText: { flex: 1, fontSize: 14, color: '#5f5a75' },
-  dateClearBtn: { color: '#878787', fontSize: 14, fontWeight: 'bold' },
-  messageInput: {
-    borderWidth: 1,
-    borderColor: 'rgba(124,58,237,0.15)',
-    backgroundColor: '#f1f3f6',
-    padding: 12,
-    fontSize: 13,
-    color: '#2d2a3a',
-    borderRadius: 10,
-    textAlignVertical: 'top',
-    minHeight: 70
-  },
-  btnBook: {
-    backgroundColor: '#2874f0',
-    padding: 14,
-    borderRadius: 12,
-    alignItems: 'center',
-    marginTop: 12
-  },
-  btnBookText: { color: '#ffffff', fontWeight: 'bold', fontSize: 14 },
-  successBox: { alignItems: 'center', paddingVertical: 16 },
-  successIcon: { fontSize: 40, marginBottom: 8 },
-  successTitle: { fontSize: 18, color: '#10b981', fontWeight: 'bold', marginBottom: 6 },
-  successText: { fontSize: 14, color: '#2d2a3a', marginTop: 3 },
-  chatSuccessBtn: {
-    marginTop: 14,
-    backgroundColor: '#2874f0',
-    paddingVertical: 10,
-    paddingHorizontal: 20,
-    borderRadius: 50
-  },
-  chatSuccessBtnText: { color: '#ffffff', fontWeight: 'bold', fontSize: 13 },
-  writeReviewBox: {
-    backgroundColor: '#f1f3f6',
-    borderRadius: 12,
-    padding: 14,
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: 'rgba(124,58,237,0.1)'
-  },
-  writeReviewTitle: { fontSize: 14, fontWeight: 'bold', color: '#212121', marginBottom: 10 },
-  starsRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 10 },
-  starIcon: { fontSize: 26, color: '#d1c7f0' },
-  starIconActive: { color: '#f59e0b' },
-  ratingLabel: { fontSize: 12, color: '#878787', marginLeft: 4 },
-  commentInput: {
-    backgroundColor: '#ffffff',
-    borderWidth: 1,
-    borderColor: 'rgba(124,58,237,0.15)',
-    borderRadius: 8,
-    padding: 10,
-    fontSize: 13,
-    color: '#2d2a3a',
-    marginBottom: 10,
-    minHeight: 60,
-    textAlignVertical: 'top'
-  },
-  btnSubmitReview: {
-    backgroundColor: '#2874f0',
-    paddingVertical: 10,
-    paddingHorizontal: 18,
-    borderRadius: 8,
-    alignSelf: 'flex-end'
-  },
-  btnSubmitReviewText: { color: '#ffffff', fontWeight: 'bold', fontSize: 12 },
-  reviewItem: {
-    paddingVertical: 14,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(124,58,237,0.08)'
-  },
-  reviewHeader: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 8 },
-  reviewAvatar: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    backgroundColor: '#2874f0',
-    alignItems: 'center',
-    justifyContent: 'center'
-  },
-  reviewAvatarText: { color: '#ffffff', fontWeight: 'bold', fontSize: 14 },
-  reviewUser: { fontWeight: 'bold', color: '#212121', fontSize: 13 },
-  reviewDate: { fontSize: 11, color: '#878787', marginTop: 1 },
-  reviewStarsBox: {},
-  reviewStars: { color: '#f59e0b', fontSize: 14 },
-  reviewComment: { fontSize: 13, color: '#5f5a75', lineHeight: 20 },
-  noReviewsBox: { paddingVertical: 20, alignItems: 'center' },
-  noReviewsText: { color: '#878787', fontSize: 13 },
-  // Full-screen Gallery Modal
-  galleryModal: {
-    flex: 1,
-    backgroundColor: '#000000',
-    justifyContent: 'center'
-  },
-  galleryClose: {
-    position: 'absolute',
-    top: 50,
+    top: 50, // To account for safe area
+    left: 20,
     right: 20,
-    zIndex: 10,
-    backgroundColor: 'rgba(255,255,255,0.15)',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  iconCircle: {
     width: 40,
     height: 40,
     borderRadius: 20,
+    backgroundColor: '#ffffff',
+    justifyContent: 'center',
     alignItems: 'center',
-    justifyContent: 'center'
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
-  galleryCloseText: { color: '#ffffff', fontSize: 18, fontWeight: 'bold' },
-  galleryCounter: {
-    position: 'absolute',
-    top: 55,
-    left: 20,
-    color: '#ffffff',
+  topActionsRight: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  infoCard: {
+    backgroundColor: '#ffffff',
+    borderTopLeftRadius: 30,
+    borderTopRightRadius: 30,
+    marginTop: -30,
+    paddingHorizontal: 20,
+    paddingTop: 24,
+    paddingBottom: 20,
+  },
+  titleRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 12,
+  },
+  hostelName: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    color: '#1f2937',
+    flexWrap: 'wrap',
+  },
+  ratingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginLeft: 8,
+    marginTop: 4,
+  },
+  ratingText: {
     fontSize: 14,
-    fontWeight: '600',
-    zIndex: 10
+    fontWeight: 'bold',
+    color: '#f59e0b',
+    marginLeft: 2,
   },
-  gallerySlide: { width: SCREEN_WIDTH, justifyContent: 'center', alignItems: 'center' },
-  galleryImage: { width: SCREEN_WIDTH, height: '80%' },
-  // Date Picker Modal
-  dateModalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
-  dateModal: {
+  reviewCount: {
+    fontSize: 12,
+    color: '#6b7280',
+    marginLeft: 2,
+  },
+  premiumBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fef3c7',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  premiumText: {
+    color: '#92400e',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  chipsRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginBottom: 16,
+  },
+  chip: {
+    backgroundColor: '#e0e7ff',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+  },
+  chipText: {
+    color: '#4F46E5',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  locationRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginBottom: 8,
+    paddingRight: 20,
+  },
+  addressText: {
+    fontSize: 13,
+    color: '#6b7280',
+    marginLeft: 6,
+    lineHeight: 18,
+    flex: 1,
+  },
+  distanceRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginLeft: 2,
+  },
+  distanceText: {
+    fontSize: 13,
+    color: '#4F46E5',
+    fontWeight: '600',
+    marginLeft: 6,
+  },
+  section: {
+    paddingHorizontal: 20,
+    paddingTop: 10,
+    marginBottom: 20,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#1f2937',
+    marginBottom: 16,
+  },
+  highlightsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    rowGap: 24,
+    justifyContent: 'flex-start',
+  },
+  highlightItem: {
+    width: '25%',
+    alignItems: 'center',
+  },
+  highlightIconBox: {
+    width: 48,
+    height: 48,
+    borderRadius: 16,
+    backgroundColor: '#f3f4f6',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  highlightText: {
+    fontSize: 11,
+    color: '#4b5563',
+    fontWeight: '500',
+    textAlign: 'center',
+  },
+  aboutText: {
+    fontSize: 14,
+    color: '#4b5563',
+    lineHeight: 22,
+  },
+  pricingHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  seeAllText: {
+    color: '#4F46E5',
+    fontWeight: 'bold',
+    fontSize: 14,
+  },
+  pricingCard: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: '#f8faff',
+    borderWidth: 1,
+    borderColor: '#e0e7ff',
+    borderRadius: 16,
+    padding: 16,
+    marginTop: 8,
+  },
+  pricingCardTitle: {
+    fontSize: 15,
+    fontWeight: 'bold',
+    color: '#1f2937',
+  },
+  pricingCardSub: {
+    fontSize: 13,
+    color: '#6b7280',
+    marginTop: 2,
+  },
+  rulesContainer: {
+    gap: 12,
+  },
+  ruleItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f9fafb',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 12,
+  },
+  ruleText: {
+    fontSize: 14,
+    color: '#4b5563',
+    marginLeft: 12,
+    fontWeight: '500',
+  },
+  foodContainer: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  foodItem: {
+    flex: 1,
+    backgroundColor: '#fffbeb',
+    padding: 16,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#fef3c7',
+  },
+  foodTitle: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#92400e',
+    marginBottom: 4,
+  },
+  foodDesc: {
+    fontSize: 12,
+    color: '#b45309',
+    lineHeight: 18,
+  },
+  bottomBar: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: '#ffffff',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingTop: 12,
+    paddingBottom: 24,
+    borderTopWidth: 1,
+    borderTopColor: '#f3f4f6',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 10,
+  },
+  bottomAction: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  bottomActionText: {
+    fontSize: 11,
+    color: '#6b7280',
+    marginTop: 4,
+    fontWeight: '500',
+  },
+  bookBtn: {
+    flexDirection: 'row',
+    backgroundColor: '#4F46E5',
+    paddingHorizontal: 24,
+    paddingVertical: 14,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flex: 0.8,
+  },
+  bookBtnText: {
+    color: '#ffffff',
+    fontSize: 15,
+    fontWeight: 'bold',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    justifyContent: 'flex-end',
+  },
+  modalContent: {
     backgroundColor: '#ffffff',
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
-    padding: 20,
-    paddingBottom: 36
+    height: '92%',
+    paddingTop: 16,
   },
-  dateModalTitle: { fontSize: 18, fontWeight: 'bold', color: '#212121', textAlign: 'center', marginBottom: 16 },
-  monthNav: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
-  monthNavArrow: { fontSize: 28, color: '#2874f0', fontWeight: 'bold', paddingHorizontal: 12 },
-  monthLabel: { fontSize: 16, fontWeight: 'bold', color: '#212121' },
-  dayHeaders: { flexDirection: 'row', marginBottom: 8 },
-  dayHeader: { flex: 1, textAlign: 'center', fontSize: 12, color: '#878787', fontWeight: 'bold' },
-  calendarGrid: { flexDirection: 'row', flexWrap: 'wrap' },
-  dayCell: { width: `${100 / 7}%`, aspectRatio: 1, alignItems: 'center', justifyContent: 'center' },
-  dayCellSelected: { backgroundColor: '#2874f0', borderRadius: 50 },
-  dayCellPast: { opacity: 0.3 },
-  dayText: { fontSize: 14, color: '#212121', fontWeight: '500' },
-  dayTextSelected: { color: '#ffffff', fontWeight: 'bold' },
-  dayTextPast: { color: '#c4b5fd' },
-  dateModalClose: {
-    marginTop: 16,
-    paddingVertical: 12,
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(124,58,237,0.1)'
+    paddingHorizontal: 20,
+    paddingBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f3f4f6',
   },
-  dateModalCloseText: { color: '#ef4444', fontWeight: 'bold', fontSize: 14 },
+  modalCloseBtn: {
+    padding: 4,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#1f2937',
+  },
+  modalScroll: {
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    gap: 16,
+  },
+  roomCard: {
+    flexDirection: 'row',
+    backgroundColor: '#ffffff',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#f3f4f6',
+    padding: 12,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  roomCardSelected: {
+    borderColor: '#4F46E5',
+    backgroundColor: '#f8faff',
+  },
+  roomImageContainer: {
+    width: 80,
+    height: 80,
+    borderRadius: 12,
+    backgroundColor: '#f3f4f6',
+    overflow: 'hidden',
+  },
+  roomImage: {
+    width: '100%',
+    height: '100%',
+  },
+  roomInfo: {
+    flex: 1,
+    marginLeft: 16,
+    justifyContent: 'center',
+  },
+  roomType: {
+    fontSize: 15,
+    fontWeight: 'bold',
+    color: '#1f2937',
+    marginBottom: 8,
+  },
+  roomPriceRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+  },
+  roomPrice: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#4F46E5',
+  },
+  roomPriceUnit: {
+    fontSize: 14,
+    color: '#9ca3af',
+    marginLeft: 2,
+    fontWeight: '500',
+  },
+  vacancyText: {
+    position: 'absolute',
+    top: 16,
+    right: 16,
+    fontSize: 13,
+    color: '#10b981',
+    fontWeight: 'bold',
+  },
+  modalFooter: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: '#ffffff',
+    padding: 20,
+    borderTopWidth: 1,
+    borderTopColor: '#f3f4f6',
+  },
+  bookNowBtn: {
+    backgroundColor: '#4F46E5',
+    paddingVertical: 18,
+    borderRadius: 16,
+    alignItems: 'center',
+  },
+  bookNowText: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  overallRatingBox: {
+    flexDirection: 'row',
+    backgroundColor: '#ffffff',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#f3f4f6',
+    padding: 20,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
+    marginBottom: 20,
+  },
+  overallRatingLeft: {
+    alignItems: 'center',
+    borderRightWidth: 1,
+    borderRightColor: '#e5e7eb',
+    paddingRight: 20,
+    marginRight: 20,
+  },
+  bigRatingNum: { fontSize: 40, fontWeight: 'bold', color: '#1f2937' },
+  overallText: { fontSize: 13, fontWeight: '600', color: '#4b5563', marginTop: 4 },
+  reviewCountText: { fontSize: 12, color: '#9ca3af', marginTop: 2 },
+  ratingBars: { flex: 1, gap: 6 },
+  ratingBarRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  starsGroup: { width: 14, alignItems: 'center' },
+  barTrack: { flex: 1, height: 6, backgroundColor: '#f3f4f6', borderRadius: 3, overflow: 'hidden' },
+  barFill: { height: '100%', backgroundColor: '#f59e0b', borderRadius: 3 },
+  barValue: { width: 20, fontSize: 11, color: '#6b7280', fontWeight: '500' },
+  
+  categoryRatings: { gap: 12, marginBottom: 24, paddingHorizontal: 4 },
+  categoryRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  categoryName: { fontSize: 14, color: '#4b5563', fontWeight: '500' },
+  categoryScore: { fontSize: 14, color: '#1f2937', fontWeight: 'bold' },
 
-  // Payment Modal
-  paymentModalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' },
-  paymentModal: { backgroundColor: '#ffffff', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, alignItems: 'center' },
-  paymentModalIcon: { fontSize: 48, marginBottom: 16 },
-  paymentModalTitle: { fontSize: 20, fontWeight: '900', color: '#212121', marginBottom: 10 },
-  paymentModalDesc: { fontSize: 14, color: '#5f5a75', textAlign: 'center', lineHeight: 22, marginBottom: 20, paddingHorizontal: 10 },
-  paymentProcessing: { alignItems: 'center', paddingVertical: 20 },
-  paymentProcessingText: { fontSize: 14, color: '#2874f0', fontWeight: '600', marginTop: 12 },
-  paymentActionRow: { width: '100%', gap: 12 },
-  payBtn: { backgroundColor: '#2874f0', paddingVertical: 14, borderRadius: 12, alignItems: 'center', width: '100%' },
-  payBtnText: { color: '#ffffff', fontSize: 15, fontWeight: 'bold' },
-  uploadBtn: { backgroundColor: '#10b981', paddingVertical: 14, borderRadius: 12, alignItems: 'center', width: '100%' },
-  payCancelBtn: { paddingVertical: 12, alignItems: 'center', width: '100%' },
-  payCancelText: { color: '#878787', fontSize: 14, fontWeight: 'bold' },
-  qrCodeImage: { width: 160, height: 160, marginBottom: 20 }
+  segmentedControl: { flexDirection: 'row', backgroundColor: '#f5f3ff', borderRadius: 12, padding: 4, marginBottom: 24 },
+  segmentTab: { flex: 1, paddingVertical: 10, alignItems: 'center', borderRadius: 10 },
+  segmentTabActive: { backgroundColor: '#ffffff', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 4, elevation: 1 },
+  segmentText: { fontSize: 14, color: '#6b7280', fontWeight: '600' },
+  segmentTextActive: { color: '#4F46E5' },
+
+  reviewCard: { marginBottom: 20 },
+  reviewHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
+  reviewerAvatar: { width: 40, height: 40, borderRadius: 20 },
+  reviewerInfo: { flex: 1, marginLeft: 12 },
+  reviewerName: { fontSize: 15, fontWeight: 'bold', color: '#1f2937' },
+  reviewerSub: { fontSize: 12, color: '#9ca3af' },
+  reviewerDate: { fontSize: 11, color: '#d1d5db', marginTop: 2 },
+  reviewContent: { fontSize: 14, color: '#4b5563', lineHeight: 22, marginBottom: 12 },
+  reviewPhotos: { flexDirection: 'row', gap: 8 },
+  reviewPhoto: { width: 60, height: 60, borderRadius: 8 },
+
+  formLabel: { fontSize: 15, fontWeight: 'bold', color: '#1f2937', marginBottom: 12, marginTop: 4 },
+  calendarMock: { marginBottom: 24 },
+  calendarHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 16, alignItems: 'center' },
+  calendarMonth: { fontSize: 15, fontWeight: 'bold', color: '#1f2937' },
+  calendarWeek: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 12 },
+  calDayName: { width: 40, textAlign: 'center', fontSize: 13, color: '#9ca3af', fontWeight: '600' },
+  calendarGrid: { gap: 8 },
+  calRow: { flexDirection: 'row', justifyContent: 'space-between' },
+  calCell: { width: 40, alignItems: 'center' },
+  calDayOuter: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
+  calDayActiveOuter: { backgroundColor: '#4F46E5' },
+  calDayNum: { fontSize: 14, color: '#4b5563', fontWeight: '500' },
+  calDayNumActive: { color: '#ffffff', fontWeight: 'bold' },
+  calDot: { width: 4, height: 4, borderRadius: 2, backgroundColor: '#4F46E5', marginTop: 2 },
+
+  timeSlotsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 24 },
+  timeSlot: { paddingVertical: 10, paddingHorizontal: 16, borderRadius: 12, borderWidth: 1, borderColor: '#e5e7eb', backgroundColor: '#ffffff' },
+  timeSlotActive: { borderColor: '#4F46E5', backgroundColor: '#f8faff' },
+  timeSlotText: { fontSize: 13, color: '#6b7280', fontWeight: '600' },
+  timeSlotTextActive: { color: '#4F46E5' },
+
+  dropdownMock: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderWidth: 1, borderColor: '#e5e7eb', borderRadius: 12, paddingHorizontal: 16, paddingVertical: 14, marginBottom: 24 },
+  dropdownText: { fontSize: 14, color: '#4b5563', fontWeight: '500' },
+  textAreaContainer: { borderWidth: 1, borderColor: '#e5e7eb', borderRadius: 12, padding: 16, height: 100, backgroundColor: '#ffffff' },
+  textAreaPlaceholder: { fontSize: 14, color: '#9ca3af' },
 });

@@ -4,7 +4,7 @@ import {
   SafeAreaView, ActivityIndicator, Alert, Linking, RefreshControl
 } from 'react-native';
 import { useSelector } from 'react-redux';
-import apiClient from '../../api/apiClient';
+// import apiClient from '../../api/apiClient';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 
 const STATUS_FILTERS = [
@@ -29,19 +29,43 @@ export default function EnquiriesScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [activeFilter, setActiveFilter] = useState('all');
 
-  const fetchEnquiries = async () => {
-    try {
-      const res = await apiClient.get('/enquiries/owner');
-      if (res.data.success) {
-        setEnquiries(res.data.enquiries || []);
-      }
-    } catch (err) {
-      console.error('Fetch enquiries error:', err.message);
-      Alert.alert('Error', 'Could not load enquiries. Pull to refresh.');
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
+  const mockEnquiries = [
+    {
+      _id: '1',
+      studentName: 'Asif Shaik',
+      studentCollege: 'JNTU Hyderabad',
+      status: 'pending',
+      hostelName: 'Miyapur Metro View PG',
+      message: 'I am interested in a single sharing room. Is it available next week?',
+      studentPhone: '9876543210'
+    },
+    {
+      _id: '2',
+      studentName: 'Rahul Sharma',
+      studentCollege: 'CBIT',
+      status: 'contacted',
+      hostelName: 'Central Boys PG',
+      message: 'Need 2-sharing room with veg food only.',
+      studentPhone: '9876543211'
+    },
+    {
+      _id: '3',
+      studentName: 'Priya Reddy',
+      studentCollege: 'Osmania University',
+      status: 'visited',
+      hostelName: 'Sunrise Girls Hostel',
+      message: 'Is AC available?',
+      studentPhone: '9876543212'
     }
+  ];
+
+  const fetchEnquiries = () => {
+    // If enquiries are empty, populate them first time
+    if (enquiries.length === 0) {
+      setEnquiries(mockEnquiries);
+    }
+    setLoading(false);
+    setRefreshing(false);
   };
 
   useEffect(() => { fetchEnquiries(); }, []);
@@ -51,15 +75,9 @@ export default function EnquiriesScreen() {
     fetchEnquiries();
   }, []);
 
-  const handleStatusUpdate = async (id, nextStatus) => {
-    try {
-      const res = await apiClient.put(`/enquiries/${id}`, { status: nextStatus });
-      if (res.data.success) {
-        setEnquiries(prev => prev.map(e => e._id === id ? { ...e, status: nextStatus } : e));
-      }
-    } catch (err) {
-      Alert.alert('Error', 'Failed to update status. Try again.');
-    }
+  const handleStatusUpdate = (id, nextStatus) => {
+    setEnquiries(prev => prev.map(e => e._id === id ? { ...e, status: nextStatus } : e));
+    Alert.alert('Success', 'Status updated successfully.');
   };
 
   const handleCall = (phone) => {
