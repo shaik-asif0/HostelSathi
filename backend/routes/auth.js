@@ -34,7 +34,7 @@ router.post(
       return res.status(400).json({ success: false, errors: errors.array() });
     }
 
-    const { name, phone, email, password, role, college } = req.body;
+    const { name, phone, email, password, role, college, hostelName } = req.body;
 
     try {
       // Check if user exists (by email or phone)
@@ -58,7 +58,8 @@ router.post(
         email,
         password: hashedPassword,
         role,
-        college: role === 'student' ? (college || '') : ''
+        college: role === 'student' ? (college || '') : '',
+        hostelName: role === 'owner' ? (hostelName || '') : ''
       });
 
       res.status(201).json({
@@ -70,7 +71,8 @@ router.post(
           phone: user.phone,
           email: user.email,
           role: user.role,
-          college: user.college
+          college: user.college,
+          hostelName: user.hostelName
         }
       });
     } catch (error) {
@@ -127,6 +129,7 @@ router.post(
           email: user.email,
           role: user.role,
           college: user.college,
+          hostelName: user.hostelName,
           unlockedHostels: user.unlockedHostels || []
         }
       });
@@ -189,6 +192,7 @@ router.post('/verify-otp', async (req, res) => {
           email: user.email,
           role: user.role,
           college: user.college,
+          hostelName: user.hostelName,
           unlockedHostels: user.unlockedHostels || []
         }
       });

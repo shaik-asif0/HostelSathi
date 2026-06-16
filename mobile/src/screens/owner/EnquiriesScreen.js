@@ -4,7 +4,7 @@ import {
   SafeAreaView, ActivityIndicator, Alert, Linking, RefreshControl
 } from 'react-native';
 import { useSelector } from 'react-redux';
-// import apiClient from '../../api/apiClient';
+import { enquiriesAPI } from '../../api/apiClient';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 
 const STATUS_FILTERS = [
@@ -59,10 +59,17 @@ export default function EnquiriesScreen() {
     }
   ];
 
-  const fetchEnquiries = () => {
-    // If enquiries are empty, populate them first time
-    if (enquiries.length === 0) {
-      setEnquiries(mockEnquiries);
+  const fetchEnquiries = async () => {
+    try {
+      const res = await enquiriesAPI.getOwnerEnquiries();
+      if (res.data.success) {
+        setEnquiries(res.data.enquiries);
+      } else {
+        if (enquiries.length === 0) setEnquiries(mockEnquiries);
+      }
+    } catch (error) {
+      console.log('Error fetching enquiries:', error);
+      if (enquiries.length === 0) setEnquiries(mockEnquiries);
     }
     setLoading(false);
     setRefreshing(false);
@@ -75,9 +82,15 @@ export default function EnquiriesScreen() {
     fetchEnquiries();
   }, []);
 
-  const handleStatusUpdate = (id, nextStatus) => {
+  const handleStatusUpdate = async (id, nextStatus) => {
+    // Optimistic UI update
     setEnquiries(prev => prev.map(e => e._id === id ? { ...e, status: nextStatus } : e));
-    Alert.alert('Success', 'Status updated successfully.');
+    try {
+      await enquiriesAPI.updateStatus(id, nextStatus);
+    } catch (error) {
+      console.log('Error updating status:', error);
+      Alert.alert('Error', 'Failed to sync status update with server.');
+    }
   };
 
   const handleCall = (phone) => {

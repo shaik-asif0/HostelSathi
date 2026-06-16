@@ -38,6 +38,7 @@ export default function AuthScreen({ navigation }) {
   const [regEmail, setRegEmail] = useState("");
   const [regPassword, setRegPassword] = useState("");
   const [regCollege, setRegCollege] = useState("");
+  const [regHostelName, setRegHostelName] = useState("");
 
   // OTP state
   const [otpPhone, setOtpPhone] = useState("");
@@ -60,6 +61,7 @@ export default function AuthScreen({ navigation }) {
     setRegEmail("");
     setRegPassword("");
     setRegCollege("");
+    setRegHostelName("");
     setOtpPhone("");
     setOtpCode("");
     setOtpSent(false);
@@ -112,6 +114,7 @@ export default function AuthScreen({ navigation }) {
         password: regPassword,
         role,
         college: role === "student" ? regCollege.trim() : "",
+        hostelName: role === "owner" ? regHostelName.trim() : "",
       });
       if (res.data.success) {
         await AsyncStorage.multiSet([
@@ -262,6 +265,23 @@ export default function AuthScreen({ navigation }) {
               <Text style={styles.title}>Create Account</Text>
               <Text style={styles.subtitle}>Sign up to get started</Text>
 
+              {/* Role Selection */}
+              <Text style={styles.label}>I am a...</Text>
+              <View style={styles.roleContainer}>
+                <TouchableOpacity 
+                  style={[styles.roleBtn, role === 'student' && styles.roleBtnActive]} 
+                  onPress={() => setRole('student')}
+                >
+                  <Text style={[styles.roleText, role === 'student' && styles.roleTextActive]}>Student</Text>
+                </TouchableOpacity>
+                <TouchableOpacity 
+                  style={[styles.roleBtn, role === 'owner' && styles.roleBtnActive]} 
+                  onPress={() => setRole('owner')}
+                >
+                  <Text style={[styles.roleText, role === 'owner' && styles.roleTextActive]}>Hostel Owner</Text>
+                </TouchableOpacity>
+              </View>
+
               <Text style={styles.label}>Full Name</Text>
               <TextInput
                 style={styles.input}
@@ -308,14 +328,29 @@ export default function AuthScreen({ navigation }) {
                 </TouchableOpacity>
               </View>
 
-              <Text style={styles.label}>College Name</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="Enter your college name"
-                placeholderTextColor="#9ca3af"
-                value={regCollege}
-                onChangeText={setRegCollege}
-              />
+              {role === 'student' ? (
+                <>
+                  <Text style={styles.label}>College Name</Text>
+                  <TextInput
+                    style={styles.input}
+                    placeholder="Enter your college name"
+                    placeholderTextColor="#9ca3af"
+                    value={regCollege}
+                    onChangeText={setRegCollege}
+                  />
+                </>
+              ) : (
+                <>
+                  <Text style={styles.label}>Hostel Property Name</Text>
+                  <TextInput
+                    style={styles.input}
+                    placeholder="Enter your hostel property name"
+                    placeholderTextColor="#9ca3af"
+                    value={regHostelName}
+                    onChangeText={setRegHostelName}
+                  />
+                </>
+              )}
 
               <TouchableOpacity style={[styles.primaryBtn, { marginTop: 20 }]} onPress={handleRegister} disabled={loading}>
                 {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.primaryBtnText}>Register</Text>}
@@ -579,5 +614,33 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     color: "#9ca3af",
     fontSize: 13,
+  },
+  /* Role Selection */
+  roleContainer: {
+    flexDirection: 'row',
+    marginBottom: 20,
+    gap: 12,
+  },
+  roleBtn: {
+    flex: 1,
+    paddingVertical: 12,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+    borderRadius: 12,
+    alignItems: 'center',
+    backgroundColor: '#ffffff',
+  },
+  roleBtnActive: {
+    borderColor: '#4f46e5',
+    backgroundColor: '#f5f3ff',
+    borderWidth: 2,
+  },
+  roleText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#6b7280',
+  },
+  roleTextActive: {
+    color: '#4f46e5',
   }
 });

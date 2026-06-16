@@ -34,6 +34,12 @@ const UserSchema = new mongoose.Schema({
     // Optional, relevant for students
     default: ''
   },
+  hostelName: {
+    type: String,
+    trim: true,
+    // Optional, relevant for owners
+    default: ''
+  },
   // Push Notification FCM Token
   fcmToken: {
     type: String,

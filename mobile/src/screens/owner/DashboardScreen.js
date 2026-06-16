@@ -5,7 +5,7 @@ import {
 } from 'react-native';
 import { useSelector } from 'react-redux';
 import Ionicons from 'react-native-vector-icons/Ionicons';
-import apiClient from '../../api/apiClient';
+import apiClient, { enquiriesAPI } from '../../api/apiClient';
 
 const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
@@ -49,11 +49,23 @@ export default function DashboardScreen({ navigation }) {
     fetchDashboardData();
   }, [userId]);
 
-  const fetchDashboardData = () => {
-    // We just set all hostels since the mock DB represents all hostels. 
-    // In a real app we'd filter by owner ID. For now we show all or just the mock DB.
-    setHostels(allHostels);
-    setLeadsCount(12); // Mock leads count
+  const fetchDashboardData = async () => {
+    // Filter hostels by owner ID if possible, otherwise show all as a fallback for the mockup
+    const userHostels = allHostels.filter(h => h.owner === userId);
+    setHostels(userHostels.length > 0 ? userHostels : allHostels);
+
+    try {
+      const res = await enquiriesAPI.getOwnerEnquiries();
+      if (res.data.success) {
+        setLeadsCount(res.data.count);
+      } else {
+        setLeadsCount(12); // Mock fallback
+      }
+    } catch (error) {
+      console.log("Failed to fetch leads for dashboard", error);
+      setLeadsCount(12); // Mock fallback
+    }
+    
     setRefreshing(false);
   };
 
@@ -335,76 +347,110 @@ export default function DashboardScreen({ navigation }) {
         }
       >
 
-        {/* Premium Welcome Banner */}
-        <View style={styles.proHeaderBg}>
-          <View style={styles.header}>
-            <View>
-              <Text style={styles.welcomeText}>Welcome back,</Text>
-              <Text style={styles.ownerName}>{user?.name} Garu</Text>
+        {/* Custom Header */}
+        <View style={styles.topNav}>
+          <TouchableOpacity>
+            <Ionicons name="menu" size={28} color="#1e1b29" />
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => navigation.navigate('Notifications')}>
+            <View style={styles.bellIconContainer}>
+              <Ionicons name="notifications-outline" size={24} color="#1e1b29" />
+              <View style={styles.redDot} />
             </View>
-            <View style={styles.proBadge}>
-              <Text style={styles.proBadgeText}>PRO DASHBOARD</Text>
-            </View>
+          </TouchableOpacity>
+        </View>
+
+        {/* Greeting Section */}
+        <View style={styles.greetingSection}>
+          <View style={styles.profilePicContainer}>
+            <Ionicons name="person-circle" size={56} color="#c4b5fd" />
+          </View>
+          <View style={styles.greetingTextContainer}>
+            <Text style={styles.greetingLight}>Good Morning, 👋</Text>
+            <Text style={styles.ownerNameDark}>{user?.name || "Asif Shaik"}</Text>
+            <Text style={styles.greetingSub}>Welcome back to your dashboard</Text>
           </View>
         </View>
 
-        {/* Summary Stats Grid (Overlapping) */}
-        <View style={styles.statsGrid}>
-          <View style={[styles.statCard, styles.statCardGlass]}>
-            <View style={styles.statIconWrapperPurple}><Ionicons name="home" size={20} color="#4F46E5" /></View>
-            <Text style={styles.statCardVal}>{hostels.length}</Text>
-            <Text style={styles.statCardLabel}>Active Listings</Text>
-          </View>
-          <View style={[styles.statCard, styles.statCardGlass]}>
-            <View style={styles.statIconWrapperGreen}><Ionicons name="mail" size={20} color="#10b981" /></View>
-            <Text style={styles.statCardVal}>{leadsCount}</Text>
-            <Text style={styles.statCardLabel}>Total Leads</Text>
-          </View>
-          <View style={[styles.statCard, styles.statCardGlass]}>
-            <View style={styles.statIconWrapperAmber}><Ionicons name="eye" size={20} color="#f59e0b" /></View>
-            <Text style={styles.statCardVal}>
-              {hostels.reduce((s, h) => s + (h.viewCount || 0), 0)}
-            </Text>
-            <Text style={styles.statCardLabel}>Total Views</Text>
-          </View>
-          <View style={[styles.statCard, styles.statCardGlass]}>
-            <View style={styles.statIconWrapperBlue}><Ionicons name="star" size={20} color="#3b82f6" /></View>
-            <Text style={styles.statCardVal}>
-              {hostels.length > 0
-                ? (hostels.reduce((s, h) => s + (h.rating || 0), 0) / hostels.length).toFixed(1)
-                : '—'
-              }
-            </Text>
-            <Text style={styles.statCardLabel}>Avg Rating</Text>
-          </View>
-        </View>
-
-        {/* Revenue Forecast Card */}
-        <View style={styles.revenueCard}>
-          <View style={styles.revenueHeader}>
-            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-              <Ionicons name="cash" size={16} color="#1e1b29" style={{ marginRight: 6 }} />
-              <Text style={styles.revenueTitle}>Revenue Potential</Text>
-            </View>
-            <Text style={styles.revenueSubtitle}>Estimated full-occupancy income</Text>
-          </View>
-          <Text style={styles.revenueVal}>
-            ₹{calculatePotentialRevenue().toLocaleString('en-IN')}
-            <Text style={styles.revenueUnit}>/month</Text>
-          </Text>
-          <View style={styles.revenueBreakdown}>
-            {hostels.slice(0, 3).map(h => (
-              <View key={h._id} style={styles.revenueRow}>
-                <Text style={styles.revenueRowName} numberOfLines={1}>{h.name}</Text>
-                <Text style={styles.revenueRowVal}>
-                  ₹{(
-                    (h.rent.single || 0) * (h.availability?.singleVacancy || 1) +
-                    (h.rent.sharing2 || 0) * (h.availability?.sharing2Vacancy || 4) +
-                    (h.rent.sharing3 || 0) * (h.availability?.sharing3Vacancy || 6)
-                  ).toLocaleString('en-IN')}
-                </Text>
+        {/* 2x2 Grid Stats */}
+        <View style={styles.statsGridRow}>
+          {/* Total Hostels */}
+          <View style={styles.statCardModern}>
+            <View style={styles.statRowModern}>
+              <View style={[styles.iconBox, { backgroundColor: '#EEF2FF' }]}>
+                <Ionicons name="home-outline" size={24} color="#4F46E5" />
               </View>
-            ))}
+              <View style={styles.statTextCol}>
+                <Text style={styles.statCardLabel}>Total Hostels</Text>
+                <Text style={styles.statCardVal}>{hostels.length}</Text>
+              </View>
+            </View>
+          </View>
+          {/* Total Leads */}
+          <View style={styles.statCardModern}>
+            <View style={styles.statRowModern}>
+              <View style={[styles.iconBox, { backgroundColor: '#d1fae5' }]}>
+                <Ionicons name="document-text-outline" size={24} color="#10b981" />
+              </View>
+              <View style={styles.statTextCol}>
+                <Text style={styles.statCardLabel}>Total Leads</Text>
+                <Text style={styles.statCardVal}>{leadsCount}</Text>
+              </View>
+            </View>
+          </View>
+        </View>
+
+        <View style={styles.statsGridRow}>
+          {/* Total Bookings */}
+          <View style={styles.statCardModern}>
+            <View style={styles.statRowModern}>
+              <View style={[styles.iconBox, { backgroundColor: '#ffedd5' }]}>
+                <Ionicons name="briefcase-outline" size={24} color="#f97316" />
+              </View>
+              <View style={styles.statTextCol}>
+                <Text style={styles.statCardLabel}>Total Bookings</Text>
+                <Text style={styles.statCardVal}>45</Text>
+              </View>
+            </View>
+          </View>
+          {/* Monthly Revenue */}
+          <View style={styles.statCardModern}>
+            <View style={styles.statRowModern}>
+              <View style={[styles.iconBox, { backgroundColor: '#ffe4e6' }]}>
+                <Ionicons name="shield-checkmark-outline" size={24} color="#f43f5e" />
+              </View>
+              <View style={styles.statTextCol}>
+                <Text style={styles.statCardLabel}>Monthly Revenue</Text>
+                <Text style={styles.statCardVal} numberOfLines={1} adjustsFontSizeToFit>₹{calculatePotentialRevenue().toLocaleString('en-IN')}</Text>
+              </View>
+            </View>
+          </View>
+        </View>
+
+        {/* Occupancy and Active Rooms */}
+        <View style={styles.statsGridRow}>
+          <View style={styles.wideStatCard}>
+            <Text style={styles.statCardLabel}>Occupancy Rate</Text>
+            <Text style={[styles.statCardVal, { marginBottom: 6 }]}>78%</Text>
+            <View style={styles.progressBarBg}>
+              <View style={[styles.progressBarFill, { width: '78%' }]} />
+            </View>
+          </View>
+          <View style={styles.wideStatCard}>
+            <Text style={styles.statCardLabel}>Active Rooms</Text>
+            <Text style={[styles.statCardVal, { marginTop: 4 }]}>32 / 45</Text>
+          </View>
+        </View>
+
+        {/* Pending Requests and Unread Messages */}
+        <View style={styles.statsGridRow}>
+          <View style={styles.wideStatCard}>
+            <Text style={styles.statCardLabel}>Pending Requests</Text>
+            <Text style={[styles.statCardVal, { marginTop: 4 }]}>12</Text>
+          </View>
+          <View style={styles.wideStatCard}>
+            <Text style={styles.statCardLabel}>Unread Messages</Text>
+            <Text style={[styles.statCardVal, { marginTop: 4 }]}>8</Text>
           </View>
         </View>
 
@@ -773,79 +819,122 @@ export default function DashboardScreen({ navigation }) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F9FAFB' },
+  container: { flex: 1, backgroundColor: '#ffffff' },
   scrollContent: { padding: 16 },
-  proHeaderBg: {
-    backgroundColor: '#4c1d95',
-    paddingTop: 20,
-    paddingBottom: 60,
-    paddingHorizontal: 20,
-    borderBottomLeftRadius: 30,
-    borderBottomRightRadius: 30,
-    marginHorizontal: -16,
-    marginTop: -16,
-    marginBottom: -40
-  },
-  header: {
+  topNav: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 20
+    marginBottom: 24,
   },
-  welcomeText: { fontSize: 14, color: '#ddd6fe' },
-  ownerName: { fontSize: 24, fontWeight: '900', color: '#ffffff' },
-  proBadge: { backgroundColor: '#f59e0b', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12 },
-  proBadgeText: { color: '#fff', fontSize: 10, fontWeight: '900' },
-  statsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 16, zIndex: 10 },
-  statCard: {
-    width: '47%',
-    borderRadius: 16,
-    padding: 16,
-    alignItems: 'flex-start',
-    backgroundColor: 'rgba(255,255,255,0.9)',
+  bellIconContainer: {
+    position: 'relative',
+  },
+  redDot: {
+    position: 'absolute',
+    top: 2,
+    right: 2,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#ef4444',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.5)',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.1,
-    shadowRadius: 15,
-    elevation: 5
+    borderColor: '#ffffff',
   },
-  statIconWrapperPurple: { backgroundColor: '#EEF2FF', padding: 8, borderRadius: 12, marginBottom: 8 },
-  statIconWrapperGreen: { backgroundColor: '#d1fae5', padding: 8, borderRadius: 12, marginBottom: 8 },
-  statIconWrapperAmber: { backgroundColor: '#fef3c7', padding: 8, borderRadius: 12, marginBottom: 8 },
-  statIconWrapperBlue: { backgroundColor: '#dbeafe', padding: 8, borderRadius: 12, marginBottom: 8 },
-  statCardIcon: { fontSize: 20 },
-  statCardPurple: { backgroundColor: '#EEF2FF', borderWidth: 1, borderColor: 'rgba(124,58,237,0.15)' },
-  statCardGreen: { backgroundColor: '#d1fae5', borderWidth: 1, borderColor: 'rgba(16,185,129,0.15)' },
-  statCardAmber: { backgroundColor: '#fef3c7', borderWidth: 1, borderColor: 'rgba(245,158,11,0.15)' },
-  statCardBlue: { backgroundColor: '#dbeafe', borderWidth: 1, borderColor: 'rgba(59,130,246,0.15)' },
-  statCardIcon: { fontSize: 22, marginBottom: 6 },
-  statCardVal: { fontSize: 24, fontWeight: 'bold', color: '#1e1b29' },
-  statCardLabel: { fontSize: 11, color: '#5f5a75', marginTop: 2, fontWeight: '600' },
-  revenueCard: {
+  greetingSection: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 30,
+  },
+  profilePicContainer: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: '#f3f4f6',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 16,
+  },
+  greetingTextContainer: {
+    flex: 1,
+  },
+  greetingLight: {
+    fontSize: 14,
+    color: '#6b7280',
+    fontWeight: '500',
+    marginBottom: 2,
+  },
+  ownerNameDark: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    color: '#111827',
+    marginBottom: 2,
+  },
+  greetingSub: {
+    fontSize: 12,
+    color: '#9ca3af',
+  },
+  statsGridRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+    gap: 12,
+  },
+  statCardModern: {
+    flex: 1,
     backgroundColor: '#ffffff',
     borderRadius: 16,
     padding: 16,
-    marginBottom: 20,
     borderWidth: 1,
-    borderColor: 'rgba(124,58,237,0.15)',
-    shadowColor: '#4F46E5',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.06,
-    shadowRadius: 12,
-    elevation: 3
+    borderColor: '#f3f4f6',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.03,
+    shadowRadius: 8,
+    elevation: 2,
   },
-  revenueHeader: { marginBottom: 8 },
-  revenueTitle: { fontSize: 14, fontWeight: 'bold', color: '#1e1b29' },
-  revenueSubtitle: { fontSize: 11, color: '#a09abc', marginTop: 2 },
-  revenueVal: { fontSize: 28, fontWeight: 'bold', color: '#4F46E5', marginBottom: 12 },
-  revenueUnit: { fontSize: 14, fontWeight: 'normal', color: '#8b85a3' },
-  revenueBreakdown: { borderTopWidth: 1, borderTopColor: 'rgba(124,58,237,0.08)', paddingTop: 10 },
-  revenueRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 },
-  revenueRowName: { fontSize: 12, color: '#5f5a75', flex: 1 },
-  revenueRowVal: { fontSize: 12, fontWeight: 'bold', color: '#4F46E5' },
-  sectionTitle: { fontSize: 17, fontWeight: 'bold', color: '#1e1b29', marginBottom: 12 },
+  statRowModern: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  iconBox: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  statTextCol: {
+    flex: 1,
+    justifyContent: 'center',
+  },
+  wideStatCard: {
+    flex: 1,
+    backgroundColor: '#ffffff',
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#f3f4f6',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.03,
+    shadowRadius: 8,
+    elevation: 2,
+    justifyContent: 'center',
+  },
+  progressBarBg: {
+    height: 6,
+    backgroundColor: '#f3f4f6',
+    borderRadius: 3,
+    width: '100%',
+  },
+  progressBarFill: {
+    height: 6,
+    backgroundColor: '#4F46E5',
+    borderRadius: 3,
+  },
+  sectionTitle: { fontSize: 17, fontWeight: 'bold', color: '#1e1b29', marginBottom: 12, marginTop: 10 },
   card: {
     backgroundColor: '#ffffff',
     borderRadius: 16,
