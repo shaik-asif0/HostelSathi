@@ -34,15 +34,28 @@ router.post(
       return res.status(400).json({ success: false, errors: errors.array() });
     }
 
-    const { name, phone, email, password, role, college, hostelName } = req.body;
+      const { name, phone, email, password, role, college, hostelName } = req.body;
 
     try {
-      // Check if user exists (by email or phone)
-      let user = await User.findOne({ $or: [{ email }, { phone }] });
+      const cleanEmail = email.trim().toLowerCase();
+      const rawDigits = phone.trim().replace(/\D/g, '');
+      const cleanPhone = rawDigits.length >= 10 ? rawDigits.slice(-10) : phone.trim();
+
+      // Check if user exists (by email or phone variations)
+      const queryConditions = [
+        { email: cleanEmail },
+        { phone: phone.trim() },
+        { phone: cleanPhone }
+      ];
+      if (cleanPhone) {
+        queryConditions.push({ phone: `+91${cleanPhone}` });
+      }
+
+      let user = await User.findOne({ $or: queryConditions });
       if (user) {
         return res.status(400).json({
           success: false,
-          error: user.phone === phone ? 'Phone number already registered' : 'Email already registered'
+          error: (user.phone === phone.trim() || user.phone === cleanPhone) ? 'Phone number already registered' : 'Email already registered'
         });
       }
 
@@ -53,13 +66,13 @@ router.post(
 
       // Create user
       user = await User.create({
-        name,
-        phone,
-        email,
+        name: name.trim(),
+        phone: cleanPhone,
+        email: cleanEmail,
         password: hashedPassword,
         role,
-        college: role === 'student' ? (college || '') : '',
-        hostelName: role === 'owner' ? (hostelName || '') : ''
+        college: role === 'student' ? (college ? college.trim() : '') : '',
+        hostelName: role === 'owner' ? (hostelName ? hostelName.trim() : '') : ''
       });
 
       res.status(201).json({
@@ -104,10 +117,21 @@ router.post(
       const cleanUsername = username.trim().toLowerCase();
       const cleanPassword = password.trim();
 
+      const rawDigits = username.trim().replace(/\D/g, '');
+      const phone10 = rawDigits.length >= 10 ? rawDigits.slice(-10) : '';
+
+      const queryConditions = [
+        { email: cleanUsername },
+        { phone: username.trim() }
+      ];
+
+      if (phone10) {
+        queryConditions.push({ phone: phone10 });
+        queryConditions.push({ phone: `+91${phone10}` });
+      }
+
       // Check user by email or phone
-      const user = await User.findOne({
-        $or: [{ email: cleanUsername }, { phone: username.trim() }]
-      });
+      const user = await User.findOne({ $or: queryConditions });
 
       if (!user) {
         return res.status(400).json({ success: false, error: 'User not found. Please check your email/phone number.' });

@@ -70,14 +70,12 @@ export default function ScanAndPayScreen({ navigation }) {
             ]
           );
         } else {
-          Alert.alert('UPI App Not Found', 'No UPI app installed to handle this payment. Falling back to mock payment.', [
-            { text: "Cancel", style: "cancel" },
-            { text: "Mock Payment", onPress: confirmAndGenerateReceipt }
+          Alert.alert('UPI App Not Found', 'No UPI app installed to handle this payment.', [
+            { text: "OK", style: "cancel" }
           ]);
         }
       } else {
-        // Mock payment flow for non-UPI QRs
-        confirmAndGenerateReceipt();
+        Alert.alert('Invalid QR Code', 'Please scan a valid UPI QR code.');
       }
     } catch (error) {
       console.error(error);
@@ -88,11 +86,17 @@ export default function ScanAndPayScreen({ navigation }) {
   const confirmAndGenerateReceipt = async () => {
     try {
       setLoading(true);
-      let parsedHostelId = '666a00000000000000000000'; // dummy fallback
+      let parsedHostelId = null;
       if (qrData && qrData.includes('hostelId=')) {
         try {
           parsedHostelId = qrData.split('hostelId=')[1].split('&')[0];
         } catch (e) { }
+      }
+
+      if (!parsedHostelId) {
+        Alert.alert('Invalid QR', 'QR code does not contain a valid hostel ID.');
+        setLoading(false);
+        return;
       }
 
       const res = await apiClient.post('/payments/scan-pay', {

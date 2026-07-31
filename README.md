@@ -1,8 +1,8 @@
 # 🏠 HostelSathi
 
-> **The #1 Student Hostel Discovery App for Hyderabad — built for Telugu students, by Telugu founders.**
+> **The #1 All-in-One Student Hostel Discovery, Roommate Finder & Management Platform — built for Telugu students and PG owners, by Telugu founders.**
 
-HostelSathi connects students searching for hostels with verified hostel owners — with real photos, honest pricing, food details, and distance from college. No middlemen. No outdated info. No Google Maps guesswork.
+HostelSathi connects students searching for hostels with verified hostel owners in Hyderabad — featuring real photos, transparent pricing, food menus, campus distance breakdown, AI-powered recommendations, roommate matching, digital rent payments, OCR receipt verification, and real-time chat. No middlemen. No outdated info. No Google Maps guesswork.
 
 ---
 
@@ -10,357 +10,387 @@ HostelSathi connects students searching for hostels with verified hostel owners 
 
 | Pain Point | Current Situation | HostelSathi Solution |
 |---|---|---|
-| Outdated hostel info | Google Maps listings are stale | Owner-managed live profiles |
-| No student-specific platform | NoBroker/MagicBricks = flats, not hostels | Built only for student accommodation |
-| Can't compare before visiting | Must visit each hostel physically | Photos, pricing, food, rules — all in app |
-| No trust or reviews | Word-of-mouth only | Verified listings + student reviews |
-| Parents can't evaluate remotely | Have to come to Hyderabad | Share hostel profile link with parents |
-| No direct communication | Phone tag with owners | Real-time chat between student & owner |
-| No digital payments | Cash-only rent payments | OCR-verified UPI payments & digital receipts |
+| **Outdated Info** | Google Maps listings are stale or dead numbers | Owner-managed live profiles with real-time vacancy updates |
+| **No Student Focus** | NoBroker/MagicBricks focus on flats, not student PGs | Built specifically for student hostel & PG living |
+| **Physical Trips** | Students must visit 10+ hostels in person | Photos, food menu, rules, fee structure & campus distance in-app |
+| **Lack of Trust** | Reliance on unverified word-of-mouth | Verified student reviews (1 review per hostel) & transparent ratings |
+| **Remote Evaluation** | Parents struggle to inspect hostels from far away | Share rich hostel profiles with parents via direct share links |
+| **Roommate Friction** | Unknown roommates with mismatched habits | Dedicated **Roommate Finder** by college, course & budget |
+| **Communication** | Endless phone tag with owners | Real-time **Socket.IO chat** with typing indicators & read status |
+| **Cash Rent & Dues** | Cash-only rent with lost paper receipts | **Scan & Pay QR**, OCR UTR verification & digital rent receipts |
+| **Platform Control** | Platform admins cannot monitor spam listings | **Admin Web Portal** for listing moderation & MRR analytics |
 
 ---
 
 ## 🎯 Target Users
 
-*   **Students** — BTech / Degree / PG students relocating to Hyderabad for college.
-*   **Hostel Owners** — PG / hostel owners in Hyderabad wanting more student enquiries.
+*   **🎓 Students** — B.Tech, Degree, PG, and Competitive Exam students relocating to Hyderabad (Kukatpally, JNTU, Ameerpet, Dilsukhnagar, Gachibowli, etc.).
+*   **🏢 Hostel / PG Owners** — Owners wanting qualified student leads, instant vacancy updates, streamlined rent tracking, and digital tenant management.
+*   **🛡️ Platform Administrators** — System admins managing listing verification, platform moderation, and revenue performance.
 
 ---
 
-## ✨ Features Overview
+## ✨ Complete Features Matrix
 
-### 🎓 Student Features
-
-| Feature | Description |
-|---|---|
-| **🏠 Hostel Discovery** | Browse all listed hostels with photos, ratings, pricing, amenities, and food details |
-| **🤖 AI Recommendations** | Personalized hostel suggestions scored by budget, gender, food preference, amenities & browsing history |
-| **🔍 Advanced Search & Filters** | Filter by gender, budget (₹5K–₹20K), food type (veg/non-veg/both), amenities (WiFi, AC, Laundry, etc.), nearby college, and sort by price/rating/featured |
-| **🔎 Search History** | Persisted recent search terms for quick re-search (stored locally via AsyncStorage) |
-| **📊 Hostel Comparison** | Side-by-side comparison of up to 3 hostels on rent, rating, food, distance, and amenities |
-| **📍 Nearby Hostels (Geospatial)** | Find hostels near you using MongoDB `2dsphere` geospatial queries with configurable radius |
-| **🗺️ Map View** | View hostels on an interactive map with React Native Maps integration |
-| **📷 Photo Gallery** | Full-screen swipeable photo gallery with indicators & food photo section |
-| **⭐ Reviews & Ratings** | Read and write reviews (1–5 stars); one review per student per hostel enforced |
-| **📋 Book a Visit** | Submit enquiry with room type preference, preferred move-in date (calendar picker), and custom message |
-| **💬 Real-Time Chat** | Socket.IO powered instant messaging with typing indicators, read receipts & online presence |
-| **❤️ Saved Hostels & Collections** | Save hostels locally + organize into named collections (e.g., "Near JNTU", "Budget Options") synced to server |
-| **🔔 Notifications** | In-app notification center for new messages, enquiry updates, reviews, and system alerts with unread badge count |
-| **📞 Contact Owner** | One-tap call, WhatsApp message, or in-app chat (gated behind ₹5 payment unlock) |
-| **💳 Scan & Pay** | QR code scanner (via react-native-camera-kit) to identify hostel and initiate payment |
-| **🧾 Digital Receipts** | Auto-generated rent payment receipts with UTR verification |
-| **📜 House Rules** | View curfew time, visitor policy, smoking/drinking rules before booking |
-| **💰 Fee Transparency** | Security deposit, maintenance fee, and notice period clearly displayed |
-| **🏫 Campus Distance** | Auto-calculated walk/auto/bus travel times from hostel to nearby campus |
-| **🛏️ Room Availability** | Real-time vacancy count for Single, 2-Sharing, 3-Sharing, 4-Sharing & 5-Sharing rooms |
-| **👤 Profile Management** | Edit name, phone, college; set AI preferences (budget, gender, food, amenities) |
-| **🎬 Onboarding** | Welcome screen introducing app features to first-time users |
-
-### 🏢 Owner Features
+### 🎓 Student Mobile App Features
 
 | Feature | Description |
 |---|---|
-| **📊 Pro Dashboard** | Overview with active listings count, total leads, total views, average rating & revenue forecast |
-| **🏠 Hostel Listing Management** | Create, edit, and delete hostel profiles with all details (rent, food, amenities, rules, fees, photos) |
-| **📸 Photo Upload** | Upload up to 5/6 photos per listing with Multer (5MB limit, JPEG/PNG/WebP) |
-| **🛏️ Quick Vacancy Update** | One-tap modal to update room availability counts per room type |
-| **📩 Enquiry Management** | View all student enquiries with status pipeline: Pending → Contacted → Visited → Closed |
-| **📊 Per-Hostel Analytics** | Detailed analytics modal with: total views, weekly views sparkline chart, enquiry conversion funnel, room availability, and revenue potential |
-| **💳 UPI Payment Setup** | Set UPI ID per hostel to receive direct rent payments from students |
-| **🧑‍🎓 Tenant Management** | View active tenants, see payment details (UTR verified), send WhatsApp rent reminders, view/share digital receipts, and remove tenants |
-| **💬 Real-Time Chat** | Chat with prospective and current students via Socket.IO |
-| **🔔 Notifications** | Get alerts for new enquiries, messages, and reviews |
-| **💰 Revenue Calculator** | Estimated full-occupancy monthly income across all listings |
-
-### 🔐 Authentication Features
-
-| Feature | Description |
-|---|---|
-| **Email/Phone Registration** | Register as Student or Owner with name, phone, email, password, and college (students) |
-| **Email/Phone Login** | Login with email or phone number + password |
-| **Mock OTP Verification** | Simulated SMS OTP for phone auth (4-digit code logged to server console, `1234` bypass for testing) |
-| **JWT Authentication** | 30-day token with Bearer authorization header |
-| **Role-Based Access** | Route-level `student` and `owner` role authorization middleware |
-| **Profile Editing** | Update name, phone, college via protected API endpoint |
-| **AI Preference Setup** | Students can set budget, gender preference, food preference, and preferred amenities for personalized recommendations |
-
-### 💳 Payment & Monetization Features
-
-| Feature | Description |
-|---|---|
-| **₹5 Contact Unlock** | Students pay ₹5 to unlock owner phone, WhatsApp, map, and chat for a hostel |
-| **OCR Payment Verification** | Upload UPI payment screenshot → Tesseract.js OCR extracts 12-digit UTR → validated for uniqueness → hostel unlocked |
-| **Rent Payment via QR** | Scan hostel QR code → view amount → pay via UPI → upload screenshot → OCR verifies UTR → student joins as tenant |
-| **UTR Deduplication** | Used UTR numbers stored in DB with 1-year TTL auto-expiry to prevent reuse |
-| **Digital Receipt Generation** | Auto-generated receipts with student name, amount, date, and verified UTR number |
+| **🏠 Discovery Feed** | Interactive feed featuring AI recommendations, top-rated hostels, near-campus listings, and budget options |
+| **🤖 AI Recommendation Engine** | Personalized hostel match score based on budget, gender preference, food type, required amenities, ratings, and view popularity |
+| **🔍 Advanced Search & Filters** | Filter by rent range (₹3K–₹20K+), room sharing types (Single, 2, 3, 4, 5 sharing), gender (Boys/Girls/Co-ed), food preference (Veg/Non-Veg/Both), amenities (WiFi, AC, Laundry, Geyser, Power Backup, Gym, Security, CCTV, TV, Mess), and campus proximity |
+| **🔎 Persisted Search History** | Local search term caching via AsyncStorage for fast, seamless re-searching |
+| **🤝 Roommate Finder** | Discover potential roommates matched by college (JNTU, NRI, CBIT, OU), course (B.Tech, MBA, B.Arch), budget range, and lifestyle habits |
+| **📊 Side-by-Side Hostel Comparison** | Compare up to 3 hostels simultaneously across rent tiers, rating, food menu, distance from college, and amenity list |
+| **📍 Nearby Geospatial Search** | Locate hostels around your current coordinates or selected college hub using MongoDB `2dsphere` queries |
+| **🗺️ Interactive Map View** | View map pins of hostels with distance markers, custom markers, and direct detail navigation using React Native Maps |
+| **📷 Photo & Food Gallery** | Full-screen swipeable photo viewer for hostel rooms, washrooms, dining areas, and daily food menus |
+| **⭐ Student Reviews & Ratings** | Read verified reviews and write 1–5 star ratings (enforces 1 review per student per hostel) |
+| **📋 Book a Visit / Enquiry** | Submit booking requests with preferred room sharing, move-in date calendar picker, and custom message |
+| **💬 Real-Time Chat & Inbox** | Instant messaging powered by Socket.IO with typing indicators, online presence badges, and message history |
+| **❤️ Saved Hostels & Wishlist Collections**| Save favorite hostels and organize them into custom named collections (e.g., "Near JNTU", "Budget Options") synced to server |
+| **💳 Scan & Pay (UPI QR)** | Scan hostel UPI QR code using `react-native-camera-kit` to pay rent directly to the owner |
+| **🧾 OCR Payment & UTR Verification** | Upload UPI payment screenshot → Tesseract.js OCR extracts 12-digit UTR → validates UTR uniqueness → automatically confirms payment |
+| **💸 Rent Due Management** | View current monthly dues, due dates, pending amounts, and pay dues with one tap |
+| **📄 Digital Receipts** | Download and share auto-generated digital rent payment receipts with verified UTR numbers |
+| **📜 House Rules & Fee Transparency** | Clear breakdown of curfew timings, visitor policies, deposit amounts, maintenance fees, and notice periods |
+| **🏫 Campus Distance Breakdown** | Auto-calculated walk, auto, and bus commuting times to nearby universities and coaching centers |
+| **🛏️ Vacancy Tracker** | Real-time available bed counts for Single, 2-Sharing, 3-Sharing, 4-Sharing & 5-Sharing rooms |
+| **🔔 In-App Notifications** | Real-time notification center for messages, enquiry status changes, dues reminders, and system updates |
+| **📞 Owner Contact Unlock** | ₹5 micro-payment unlock for direct phone call, WhatsApp, and exact map navigation |
+| **🎬 Splash & Onboarding** | Animated branding splash screen + interactive welcome walkthrough |
 
 ---
 
-## 💰 Revenue Model
+### 🏢 Owner Mobile App Features
 
-| Stream | Details | Timeline |
-|---|---|---|
-| Free basic listing | Owners list for free — builds supply | Month 1 onwards |
-| Premium listing | ₹499/month — appear at top of search | Month 5 onwards |
-| Lead fee | ₹200 per confirmed booking | Month 5 onwards |
-| Contact unlock fee | ₹5 per student per hostel unlock | Month 1 onwards |
-| Vendor ads | Tiffin services, stationery shops advertising to students | Month 6 onwards |
+| Feature | Description |
+|---|---|
+| **📊 Pro Owner Dashboard** | Central dashboard with active listing counts, total student leads, profile views, average rating, and revenue forecasts |
+| **🏠 Hostel Listing Management** | Complete CRUD operations for hostel listings including rent tiers, photos, food schedules, rules, fees, and UPI ID configuration |
+| **📸 Multi-Photo Upload** | Upload up to 6 high-resolution room and food photos via Multer (JPEG/PNG/WebP, 5MB limit per photo) |
+| **🛏️ Quick Vacancy Manager** | One-tap modal to instantly update room availability across Single, 2, 3, 4, and 5 sharing options |
+| **📩 Lead & Enquiry Pipeline** | Manage student visit requests with state transitions: `Pending` → `Contacted` → `Visited` → `Closed` |
+| **📊 Per-Hostel Performance Analytics** | Analytics overview with total views, weekly view sparklines, conversion funnel, and estimated full-occupancy revenue |
+| **🧑‍🎓 Tenant Management Hub** | View active tenants, payment history, UTR verification status, send WhatsApp rent reminders with 1-tap, and manage tenant check-outs |
+| **💳 UPI Payment Setup** | Configure custom UPI IDs per hostel to collect direct payments from students |
+| **💬 Real-Time Student Chat** | Direct messaging stream to answer student queries, send visit confirmations, and coordinate move-ins |
+| **🔔 Owner Alerts** | Instant notifications for incoming student leads, new reviews, and real-time chat messages |
 
 ---
 
-## 🛠️ Tech Stack
+### 🛡️ Admin Web Portal (`admin-web`)
 
-### Frontend — React Native Mobile App
-| Technology | Purpose |
+| Feature | Description |
 |---|---|
-| **React Native 0.74** | Cross-platform iOS & Android app |
-| **Redux Toolkit** | Global state management (auth, hostels, chat, notifications) |
-| **React Navigation 6** | Stack + Bottom Tab navigators with role-based routing |
-| **Axios** | HTTP client with JWT interceptor & error handling |
-| **Socket.IO Client** | Real-time WebSocket chat |
-| **AsyncStorage** | Persistent local storage (tokens, saved hostels, filters, search history) |
-| **React Native Maps** | Interactive map view |
-| **React Native Camera Kit** | QR code scanner for Scan & Pay |
-| **React Native Image Picker** | Photo upload from device gallery |
-| **React Native Share** | Share hostel profiles |
-| **React Native View Shot** | Screenshot receipts for sharing |
-| **React Native Vector Icons** | UI icons throughout the app |
-
-### Backend — Node.js + Express.js
-| Technology | Purpose |
-|---|---|
-| **Node.js ≥18** | Server runtime |
-| **Express.js 4** | REST API framework |
-| **MongoDB Atlas + Mongoose** | NoSQL database with ODM |
-| **Socket.IO** | Real-time WebSocket server for chat |
-| **JWT (jsonwebtoken)** | Stateless authentication tokens |
-| **BCrypt.js** | Password hashing (10 salt rounds) |
-| **Multer** | Multipart file upload (photos + payment screenshots) |
-| **Tesseract.js** | OCR engine for extracting UTR from payment screenshots |
-| **Helmet** | HTTP security headers |
-| **Express Validator** | Request body validation |
-| **CORS** | Cross-origin resource sharing |
-| **Nodemon** | Development auto-restart |
-
-### Database Architecture
-| Model | Key Fields |
-|---|---|
-| **User** | name, phone, email, password, role, college, preferences, viewedHostels, savedCollections, fcmToken |
-| **Hostel** | name, owner, address, location (GeoJSON Point), rent (single/2/3/4/5-sharing), amenities, photos, foodPhotos, gender, rules, fees, availability, viewCount, weeklyViews, paymentUpiId |
-| **Review** | user, hostel, rating (1–5), comment (unique per user-hostel pair) |
-| **Enquiry** | student, hostel, owner, message, status (pending/contacted/visited/closed), moveInDate, roomType |
-| **Message** | hostel, sender, receiver, content, senderRole, read status |
-| **Notification** | user, type, title, body, data (hostelId/enquiryId/messageId), read status |
-| **Tenant** | student, hostel, owner, roomType, rentPaid, utrNumber (unique), status, joinDate |
-| **UsedUTR** | utr (unique), userId, hostelId (1-year TTL auto-expire) |
+| **🔑 Secure Admin Auth** | Web-based authentication portal for platform administrators |
+| **📊 System Performance Metrics** | View global stats: total registered hostels, active premium listings count, and calculated Monthly Recurring Revenue (MRR) |
+| **🌟 Premium Listing Toggle** | Instantly upgrade or downgrade hostels between Standard and Premium (`isPremium`) tiers |
+| **🗑️ Listing Moderation** | Inspect and delete invalid, duplicate, or policy-violating hostel listings |
+| **🖥️ Modern Responsive UI** | Built with React 19, Vite, Lucide Icons, and Tailwind CSS for seamless desktop administration |
 
 ---
 
-## 📁 Project Structure
+### 🔐 Authentication & Security
+
+| Feature | Description |
+|---|---|
+| **Multi-Role Registration** | Register as `student` or `owner` with name, phone, email, password, and college association |
+| **Phone & Email Login** | Login using email address or mobile phone number |
+| **Mock OTP Verification** | Simulated SMS OTP flow (logged to server console with `1234` test bypass) |
+| **JWT Stateless Security** | 30-day signed JSON Web Tokens sent via HTTP Bearer authorization headers |
+| **Role-Based Authorization** | Express middleware enforcing `protect` and `authorize('student', 'owner')` on sensitive routes |
+| **UTR Fraud Prevention** | 12-digit UTR extraction via Tesseract.js with `UsedUTR` MongoDB 1-year TTL collection to block duplicate receipt reuse |
+| **HTTP Security Headers** | Helmet middleware protection against XSS, clickjacking, and header sniffing |
+| **Input Sanitization** | Express Validator checks on login, registration, and listing fields |
+
+---
+
+## 🏗️ Architecture & Technology Stack
+
+```
+                     ┌──────────────────────────────────────────────┐
+                     │            HostelSathi Platform              │
+                     └──────────────────────┬───────────────────────┘
+                                            │
+         ┌──────────────────────────────────┼──────────────────────────────────┐
+         ▼                                  ▼                                  ▼
+┌─────────────────┐                ┌─────────────────┐                ┌─────────────────┐
+│   Mobile App    │                │  Admin Web Portal│                │ Backend Engine  │
+│  (React Native) │                │  (React + Vite) │                │ (Node/Express)  │
+└────────┬────────┘                └────────┬────────┘                └────────┬────────┘
+         │                                  │                                  │
+         │ REST API & WebSockets            │ REST API                         │ Mongoose ODM
+         └──────────────────────────────────┼──────────────────────────────────┘
+                                            ▼
+                                  ┌───────────────────┐
+                                  │   MongoDB Atlas   │
+                                  │ (Geospatial 2DS)  │
+                                  └───────────────────┘
+```
+
+### 📱 Frontend — Mobile Application (`mobile`, `student-app`, `owner-app`)
+*   **Core**: React Native 0.74.1, React 18.2.0
+*   **State Management**: Redux Toolkit (`authSlice`, `hostelSlice`, `chatSlice`, `notificationSlice`, `bookingsSlice`)
+*   **Navigation**: React Navigation 6 (Native Stack + Bottom Tabs with dynamic badge integration)
+*   **HTTP Client**: Axios with request/response interceptors & Bearer token injection
+*   **Real-Time Messaging**: Socket.IO Client 4.8.3
+*   **Local Storage**: `@react-native-async-storage/async-storage` for tokens, wishlist, search history, and filters
+*   **Maps & Location**: `react-native-maps` for interactive pin rendering & location visualization
+*   **Scanner & Camera**: `react-native-camera-kit` for QR code scanning & `react-native-image-picker` for photo uploads
+*   **Payments & Receipts**: `react-native-razorpay`, `react-native-view-shot` for receipt image exports, `react-native-share` for sharing profiles & receipts
+
+### 🖥️ Frontend — Admin Web Portal (`admin-web`)
+*   **Core Framework**: React 19.2.6, React Router DOM 7.17.0
+*   **Build Tool**: Vite 8.0.12
+*   **Styling**: Tailwind CSS 4.3.0, PostCSS, Autoprefixer
+*   **Icons**: Lucide React 1.18.0
+*   **HTTP**: Axios 1.17.0
+
+### ⚙️ Backend — API Server & Real-Time Engine (`backend`)
+*   **Runtime Framework**: Node.js ≥18.0.0, Express.js 4.19.2
+*   **Database & ODM**: MongoDB Atlas / Local MongoDB, Mongoose 8.4.1 (with `2dsphere` index support)
+*   **Real-Time Engine**: Socket.IO 4.8.3 (WebSockets with fallback polling)
+*   **OCR Processing Engine**: Tesseract.js 7.0.0 for automated receipt text & UTR parsing
+*   **Authentication & Cryptography**: JSONWebToken 9.0.2, BCrypt.js 2.4.3 (10 salt rounds)
+*   **File Handling**: Multer 1.4.5 (Multipart uploads with MIME validation and local/S3 fallback)
+*   **Security & Validation**: Helmet 7.1.0, Express Validator 7.1.0, CORS 2.8.5
+
+---
+
+## 🗄️ Database Schema Architecture
+
+```
+User (Students & Owners)
+├── _id, name, email, phone, password, role ('student'|'owner')
+├── college, preferences (budget, gender, food, amenities)
+└── viewedHostels[], savedCollections[], fcmToken
+
+Hostel (Geospatial & Listing Data)
+├── _id, name, owner (ref: User), address, location (GeoJSON Point: [lng, lat])
+├── rent { single, sharing2, sharing3, sharing4, sharing5 }
+├── amenities[], photos[], foodPhotos[], gender ('boys'|'girls'|'coed')
+├── rules { curfew, visitors, smoking, drinking }, fees { deposit, maintenance, noticePeriod }
+├── availability { single, sharing2, sharing3, sharing4, sharing5 }
+├── isVerified, isPremium, viewCount, weeklyViews[], paymentUpiId
+└── rating, numReviews
+
+Review (1-per-student-per-hostel)
+├── _id, user (ref: User), hostel (ref: Hostel), rating (1-5), comment
+
+Enquiry (Lead Pipeline)
+├── _id, student (ref: User), hostel (ref: Hostel), owner (ref: User)
+├── roomType, moveInDate, message, status ('pending'|'contacted'|'visited'|'closed')
+
+Message (Socket.IO Chat History)
+├── _id, hostel (ref: Hostel), sender (ref: User), receiver (ref: User)
+├── content, senderRole, read (boolean)
+
+Notification (In-App Alert Inbox)
+├── _id, user (ref: User), type, title, body, data {}, read (boolean)
+
+Tenant (Active Renters)
+├── _id, student (ref: User), hostel (ref: Hostel), owner (ref: User)
+├── roomType, rentPaid, utrNumber (unique), status ('active'|'completed'), joinDate
+
+UsedUTR (Anti-Fraud Dedup Engine)
+└── _id, utr (unique index), userId, hostelId, createdAt (1-Year TTL Index)
+```
+
+---
+
+## 📁 Repository Structure
 
 ```
 HostelSathi/
 │
-├── mobile/                          # React Native Mobile App
-│   ├── App.js                       # Root component with Redux Provider & Navigation
+├── mobile/                          # Primary React Native Mobile Application
+│   ├── App.js                       # Entry point with Provider & Navigation setup
 │   ├── src/
 │   │   ├── api/
-│   │   │   └── apiClient.js         # Axios client with interceptors + typed API methods
+│   │   │   └── apiClient.js         # Centralized Axios client & API endpoints
 │   │   ├── navigation/
-│   │   │   └── AppNavigator.js      # Role-based routing (Auth → Student → Owner stacks)
+│   │   │   └── AppNavigator.js      # Auth → Student Stack → Owner Stack router
 │   │   ├── redux/
-│   │   │   ├── store.js             # Redux store configuration
-│   │   │   ├── authSlice.js         # Authentication state (login, register, token, user)
-│   │   │   ├── hostelSlice.js       # Hostel listing state
-│   │   │   ├── chatSlice.js         # Chat/messaging state
-│   │   │   └── notificationSlice.js # Notification state + unread count
+│   │   │   ├── store.js             # Global Redux store
+│   │   │   ├── authSlice.js         # Auth session & user state
+│   │   │   ├── hostelSlice.js       # Hostel discovery & search state
+│   │   │   ├── chatSlice.js         # Socket.IO chat state & messages
+│   │   │   ├── notificationSlice.js # In-app notification center state
+│   │   │   └── bookingsSlice.js     # Dues & payment booking state
 │   │   ├── screens/
-│   │   │   ├── student/
-│   │   │   │   ├── OnboardingScreen.js    # Welcome/intro screens
-│   │   │   │   ├── AuthScreen.js          # Login + Register + OTP auth
-│   │   │   │   ├── HomeScreen.js          # Discovery feed with AI recommendations
-│   │   │   │   ├── SearchScreen.js        # Advanced search with filters & compare
-│   │   │   │   ├── HostelDetailScreen.js  # Full hostel profile, booking, reviews, payments
-│   │   │   │   ├── CompareScreen.js       # Side-by-side hostel comparison matrix
-│   │   │   │   ├── SavedScreen.js         # Saved hostels + wishlist collections
-│   │   │   │   ├── ChatScreen.js          # Real-time Socket.IO chat
-│   │   │   │   ├── NotificationsScreen.js # Notification center
-│   │   │   │   ├── ProfileScreen.js       # User profile + AI preferences
-│   │   │   │   ├── ScanAndPayScreen.js    # QR code scanner + payment flow
-│   │   │   │   ├── ReceiptScreen.js       # Digital payment receipt
-│   │   │   │   ├── MyReceiptsScreen.js    # All past receipts
-│   │   │   │   └── MapScreen.js           # Map view of hostels
-│   │   │   ├── owner/
-│   │   │   │   ├── DashboardScreen.js     # Pro dashboard with analytics & tenant management
-│   │   │   │   ├── AddHostelScreen.js     # Create/edit hostel listing form
-│   │   │   │   └── EnquiriesScreen.js     # Lead management with status pipeline
-│   │   │   └── shared/
-│   │   │       └── ConversationsScreen.js # Chat inbox (shared between student & owner)
+│   │   │   ├── student/             # Student screens (Home, Search, Compare, Roommate, etc.)
+│   │   │   ├── owner/               # Owner screens (Dashboard, AddHostel, Enquiries)
+│   │   │   └── shared/              # Shared screens (Conversations, Splash)
 │   │   └── utils/
-│   │       ├── constants.js         # App-wide constants
-│   │       └── socket.js            # Socket.IO singleton client with helpers
+│   │       ├── constants.js         # App Constants & theme definitions
+│   │       └── socket.js            # Socket.IO client helper singleton
 │   └── package.json
 │
-└── backend/                         # Node.js + Express API Server
-    ├── server.js                    # Express app + Socket.IO server + route mounting
-    ├── config/
-    │   └── db.js                    # MongoDB Atlas connection via Mongoose
-    ├── middleware/
-    │   └── auth.js                  # JWT protect + role-based authorize middleware
-    ├── models/
-    │   ├── User.js                  # User schema (student/owner, preferences, collections)
-    │   ├── Hostel.js                # Hostel schema (GeoJSON, rent tiers, availability, analytics)
-    │   ├── Review.js                # Review schema (unique per user-hostel)
-    │   ├── Enquiry.js               # Enquiry schema (status pipeline, moveInDate)
-    │   ├── Message.js               # Chat message schema (indexed for performance)
-    │   ├── Notification.js          # Notification schema (typed, with read state)
-    │   ├── Tenant.js                # Tenant schema (verified rent payments)
-    │   └── UsedUTR.js               # UTR dedup schema (1-year TTL)
-    ├── routes/
-    │   ├── auth.js                  # Register, login, OTP, profile, preferences
-    │   ├── hostels.js               # CRUD, nearby, recommended, analytics, photos, view tracking
-    │   ├── reviews.js               # Create review + get reviews per hostel
-    │   ├── enquiries.js             # Submit, list owner enquiries, update status
-    │   ├── messages.js              # Conversations list, chat history, send, mark read
-    │   ├── notifications.js         # Get, mark read, mark all read, delete, FCM token
-    │   ├── collections.js           # CRUD collections, add/remove hostels
-    │   ├── payments.js              # Unlock hostel (₹5), verify screenshot via OCR
-    │   ├── tenants.js               # Join hostel (rent OCR), list tenants, remove tenant
-    │   └── upload.js                # Generic photo upload endpoint
-    ├── utils/
-    │   └── seed.js                  # Database seeder with sample Hyderabad hostels
-    └── package.json
+├── admin-web/                       # Admin Web Management Dashboard (React + Vite)
+│   ├── index.html                   # HTML Entry Point
+│   ├── vite.config.js               # Vite build configuration
+│   ├── tailwind.config.js           # Tailwind styling configuration
+│   ├── src/
+│   │   ├── App.jsx                  # Main dashboard switcher & state
+│   │   ├── main.jsx                 # React root mount
+│   │   └── components/
+│   │       ├── Login.jsx            # Admin login screen
+│   │       └── Dashboard.jsx        # Moderation table, stats & MRR counter
+│   └── package.json
+│
+├── backend/                         # Node.js REST API + Real-Time Engine
+│   ├── server.js                    # Server init, Socket.IO listeners, route mounting
+│   ├── config/
+│   │   └── db.js                    # MongoDB Mongoose connection handler
+│   ├── middleware/
+│   │   └── auth.js                  # JWT protect & role authorization middleware
+│   ├── models/                      # Mongoose Schema definitions (User, Hostel, etc.)
+│   ├── routes/                      # RESTful Express route controllers
+│   │   ├── auth.js                  # Login, register, profile, OTP, AI preferences
+│   │   ├── hostels.js               # CRUD, geospatial, recommendations, views
+│   │   ├── reviews.js               # Review submission & retrieval
+│   │   ├── enquiries.js             # Lead pipeline management
+│   │   ├── messages.js              # REST messaging & thread history
+│   │   ├── notifications.js         # In-app notifications & FCM tokens
+│   │   ├── collections.js           # Wishlist collection CRUD
+│   │   ├── payments.js              # ₹5 contact unlock & OCR UTR extraction
+│   │   ├── tenants.js               # Tenant onboarding & rent management
+│   │   └── upload.js                # Multipart photo upload endpoint
+│   ├── utils/
+│   │   └── seed.js                  # Database seeder with sample Hyderabad hostels
+│   └── package.json
+│
+├── student-app/                     # Dedicated Student App Variant
+├── owner-app/                       # Dedicated Owner App Variant
+└── README.md                        # Master Project Documentation
 ```
 
 ---
 
-## 🔌 API Endpoints
+## 🔌 Complete API Documentation
 
-### Authentication
-```
-POST   /api/auth/register            Register student or owner
-POST   /api/auth/login               Login (email or phone) + get JWT token
-POST   /api/auth/send-otp            Send mock OTP to phone (logged to console)
-POST   /api/auth/verify-otp          Verify OTP code + auto-login/register
-GET    /api/auth/me                  Get current logged-in user profile
-PUT    /api/auth/preferences         Update AI recommendation preferences
-PUT    /api/auth/profile             Update user profile (name, phone, college)
-```
+### 🔑 Authentication (`/api/auth`)
+*   `POST /api/auth/register` — Register student or owner user
+*   `POST /api/auth/login` — Authenticate via email or phone + receive JWT
+*   `POST /api/auth/send-otp` — Request mock phone OTP code
+*   `POST /api/auth/verify-otp` — Verify OTP code and auto-authenticate
+*   `GET /api/auth/me` — Fetch current user profile details
+*   `PUT /api/auth/preferences` — Update AI recommendation preference matrix
+*   `PUT /api/auth/profile` — Update user profile details (name, phone, college)
 
-### Hostels
-```
-GET    /api/hostels                  Get all hostels (with search & filters)
-GET    /api/hostels/nearby           Hostels near coordinates (geospatial $near)
-GET    /api/hostels/recommended      AI-scored personalized recommendations (top 10)
-GET    /api/hostels/:id              Get single hostel detail
-GET    /api/hostels/:id/analytics    Owner: per-hostel analytics (views, funnel, revenue)
-POST   /api/hostels                  Owner: create listing (auth required)
-PUT    /api/hostels/:id              Owner: update listing (auth required)
-DELETE /api/hostels/:id              Owner: delete listing + cleanup photos
-POST   /api/hostels/:id/photos       Owner: upload photos (up to 5, 5MB each)
-POST   /api/hostels/:id/track-view   Increment view count + weekly analytics
-```
+### 🏠 Hostels & AI Engine (`/api/hostels`)
+*   `GET /api/hostels` — Search & filter hostels (supports text search, budget range, gender, amenities)
+*   `GET /api/hostels/nearby` — Find hostels by lat/lng coordinates via MongoDB `$near`
+*   `GET /api/hostels/recommended` — Get top 10 AI-scored personalized hostel recommendations
+*   `GET /api/hostels/:id` — Get full single hostel profile details
+*   `POST /api/hostels` — Owner: Create a new hostel listing (Auth required)
+*   `PUT /api/hostels/:id` — Owner/Admin: Update hostel details or toggle `isPremium`
+*   `DELETE /api/hostels/:id` — Owner/Admin: Permanently delete a hostel listing
+*   `POST /api/hostels/:id/photos` — Owner: Upload up to 6 hostel photos
+*   `GET /api/hostels/:id/analytics` — Owner: Per-hostel performance metrics (views, leads, revenue)
+*   `POST /api/hostels/:id/track-view` — Increment view count & log weekly analytics
 
-### Reviews
-```
-POST   /api/reviews                  Student: add review (1 per hostel, auth required)
-GET    /api/reviews/:hostelId        Get all reviews for a hostel
-```
+### ⭐ Reviews (`/api/reviews`)
+*   `POST /api/reviews` — Student: Submit hostel review & rating (1 per student per hostel)
+*   `GET /api/reviews/:hostelId` — Get all reviews for a specific hostel
 
-### Enquiries
-```
-POST   /api/enquiries                Student: submit contact/visit enquiry
-GET    /api/enquiries/owner          Owner: view received enquiries
-PUT    /api/enquiries/:id            Owner: update status (pending → contacted → visited → closed)
-```
+### 📩 Enquiries & Leads (`/api/enquiries`)
+*   `POST /api/enquiries` — Student: Book a visit or request room contact
+*   `GET /api/enquiries/owner` — Owner: View received student enquiries
+*   `PUT /api/enquiries/:id` — Owner: Update enquiry pipeline state (`pending` → `contacted` → `visited` → `closed`)
 
-### Real-Time Chat (REST + Socket.IO)
-```
-GET    /api/messages/conversations/list   Get all chat threads for current user
-GET    /api/messages/:hostelId/:studentId? Get chat history for a hostel thread
-POST   /api/messages                      Send message (REST fallback)
-PUT    /api/messages/:id/read             Mark message as read
+### 💬 Real-Time Chat (REST + Socket.IO) (`/api/messages`)
+*   `GET /api/messages/conversations/list` — Retrieve user active chat conversations
+*   `GET /api/messages/:hostelId/:studentId?` — Load thread message history
+*   `POST /api/messages` — Send chat message (REST fallback)
+*   `PUT /api/messages/:id/read` — Mark message as read
 
-Socket Events:
-  → user_online(userId)                   Register user as online
-  → join_chat({ hostelId, userId })       Join hostel-specific chat room
-  → send_message(data)                    Send real-time message
-  → typing({ hostelId, userId, receiverId, isTyping })  Typing indicator
-  ← receive_message(message)             Incoming message from other user
-  ← message_sent(message)                Confirmation of sent message
-  ← user_typing({ userId, hostelId, isTyping })  Typing notification
-  ← online_users(userIds[])              List of currently online users
+**WebSocket Events (Port 5000):**
+```
+Client Emits:
+  → user_online(userId)
+  → join_chat({ hostelId, userId })
+  → send_message({ hostelId, senderId, receiverId, content })
+  → typing({ hostelId, userId, receiverId, isTyping })
+
+Server Emits:
+  ← receive_message(message)
+  ← message_sent(message)
+  ← user_typing({ userId, hostelId, isTyping })
+  ← online_users(userIds[])
 ```
 
-### Notifications
-```
-GET    /api/notifications            Get all notifications (last 50) + unread count
-PUT    /api/notifications/:id/read   Mark single notification as read
-PUT    /api/notifications/read-all   Mark all notifications as read
-DELETE /api/notifications/:id        Delete a notification
-PUT    /api/notifications/fcm-token  Register device FCM push token
-```
+### 💳 Payments, OCR & Dues (`/api/payments` & `/api/tenants`)
+*   `POST /api/payments/unlock` — Simulate ₹5 micro-payment to unlock owner contact details
+*   `POST /api/payments/verify-screenshot` — Execute Tesseract.js OCR to extract & validate 12-digit UTR
+*   `POST /api/tenants/join` — Student joins hostel by uploading rent payment screenshot (OCR verified)
+*   `GET /api/tenants/hostel/:hostelId` — Owner: Fetch list of active tenants
+*   `PUT /api/tenants/:id/remove` — Owner: Mark tenant check-out as completed
 
-### Wishlist Collections
-```
-GET    /api/collections              Get all saved collections
-POST   /api/collections              Create a new collection
-PUT    /api/collections/:id/add      Add hostel to a collection
-PUT    /api/collections/:id/remove   Remove hostel from a collection
-PUT    /api/collections/:id/rename   Rename a collection
-DELETE /api/collections/:id          Delete a collection
-GET    /api/collections/:id/hostels  Get full hostel details in a collection
-```
-
-### Payments & OCR
-```
-POST   /api/payments/unlock              Simulate ₹5 payment to unlock hostel details
-POST   /api/payments/verify-screenshot   OCR verify payment screenshot (12-digit UTR extraction)
-```
-
-### Tenant Management
-```
-POST   /api/tenants/join                 Student joins hostel with rent payment screenshot (OCR)
-GET    /api/tenants/hostel/:hostelId      Owner: list active tenants for a hostel
-PUT    /api/tenants/:id/remove           Owner: remove tenant (mark as completed)
-```
-
-### Uploads & Utility
-```
-POST   /api/upload                   Upload multiple hostel photos (up to 6)
-GET    /api/health                   Server health check + feature list
-```
+### 🔔 Notifications & Collections (`/api/notifications` & `/api/collections`)
+*   `GET /api/notifications` — Get user notifications + unread count
+*   `PUT /api/notifications/:id/read` — Mark single notification as read
+*   `PUT /api/notifications/read-all` — Mark all notifications as read
+*   `PUT /api/notifications/fcm-token` — Save mobile device push token
+*   `GET /api/collections` — Fetch saved wishlist collections
+*   `POST /api/collections` — Create new wishlist collection
+*   `PUT /api/collections/:id/add` — Add hostel to collection
+*   `PUT /api/collections/:id/remove` — Remove hostel from collection
 
 ---
 
-## 🚀 Getting Started
+## 🤖 AI Recommendation Engine Scoring Logic
+
+Every hostel is dynamically evaluated and scored for the user based on weighted factors:
+
+$$\text{Score} = S_{\text{premium}} + S_{\text{verified}} + S_{\text{rating}} + S_{\text{reviews}} + S_{\text{views}} + S_{\text{budget}} + S_{\text{gender}} + S_{\text{food}} + S_{\text{amenities}}$$
+
+| Factor | Max Points | Logic |
+|---|---|---|
+| **Premium Boost** | **+30** | Promotes paid owner listings (`isPremium: true`) |
+| **Verified Listing** | **+20** | Trust badge score boost (`isVerified: true`) |
+| **Rating Score** | **+25** | Calculated as $\text{Rating} \times 5$ |
+| **Review Count** | **+10** | $\min(\text{ReviewCount} \times 2, 10)$ |
+| **Popularity** | **+15** | $\min(\text{ViewCount} / 10, 15)$ |
+| **Budget Fit** | **+25** | Full +25 if rent $\le$ student budget; +10 if within 120% |
+| **Gender Match** | **+15** | Exact match with student gender preference |
+| **Food Preference**| **+15** | Match if hostel provides required food type |
+| **Amenity Overlap**| **+5 each**| Points for every matching amenity (WiFi, AC, Laundry, etc.) |
+
+---
+
+## ⚡ Getting Started & Installation Guide
 
 ### Prerequisites
-- **Node.js** ≥ 18.0.0
-- **MongoDB** (local or [MongoDB Atlas](https://www.mongodb.com/atlas))
-- **Android Studio** or physical Android device (for mobile app)
-- **React Native CLI** environment setup ([guide](https://reactnative.dev/docs/environment-setup))
+*   **Node.js** ≥ 18.0.0
+*   **MongoDB** (Local instance or [MongoDB Atlas](https://www.mongodb.com/atlas))
+*   **React Native Environment** (Android Studio / Xcode setup)
+*   **Git**
 
-### 1. Backend Setup
+---
 
-Navigate to the `backend/` directory:
+### 1. Backend API Setup
+
 ```bash
+# Navigate to backend directory
 cd backend
+
+# Install dependencies
 npm install
+
+# Create environment configuration file
+cp .env.example .env
 ```
 
-Create a `.env` file in `backend/`:
+Configure `.env` in `backend/`:
 ```env
 PORT=5000
 MONGODB_URI=mongodb://127.0.0.1:27017/hostelsathi
-JWT_SECRET=hostelsathi_super_secret_key
-# Optional AWS settings (uses local storage fallback if empty)
-AWS_ACCESS_KEY=
-AWS_SECRET_KEY=
-AWS_BUCKET=
+JWT_SECRET=hostelsathi_super_secret_jwt_key_2026
 ```
 
-Seed the database with sample Hyderabad student hostels (Kukatpally, JNTU, Ameerpet):
+Seed the database with sample Hyderabad student hostels:
 ```bash
 npm run seed
 ```
@@ -369,131 +399,117 @@ Start the development server:
 ```bash
 npm run dev
 ```
+> 💡 Server runs on `http://localhost:5000` and displays your Wi-Fi network IP for mobile device connections.
 
-The server starts on `http://0.0.0.0:5000` and prints your local Wi-Fi IP for device access.
+---
 
-### 2. Mobile App Setup
+### 2. Mobile App Setup (`mobile`)
 
-Navigate to the `mobile/` directory:
 ```bash
-cd mobile
+# Navigate to mobile directory
+cd ../mobile
+
+# Install dependencies
 npm install
 ```
 
-**Important: Configure your server IP**
-
-Edit `mobile/src/api/apiClient.js` and `mobile/src/utils/socket.js`:
+**Configure Wi-Fi IP for physical devices or emulators:**
+Update `PHYSICAL_DEVICE_IP` in `mobile/src/api/apiClient.js` and `mobile/src/utils/socket.js`:
 ```javascript
-const PHYSICAL_DEVICE_IP = 'YOUR_PC_WIFI_IP'; // e.g., 192.168.1.37
+const PHYSICAL_DEVICE_IP = '192.168.x.x'; // Insert your PC's Wi-Fi IP address
 ```
 
-> 💡 Your backend server prints this IP on startup. Both files must have the same IP.
-
-Start the Metro bundler and run the app:
+Start Metro Bundler & Application:
 ```bash
+# Start Metro bundler
 npm start
-# In a new terminal:
-npm run android
-# or for iOS:
-npm run ios
+
+# In a separate terminal tab:
+npm run android    # Run on Android emulator/device
+# or
+npm run ios        # Run on iOS simulator
 ```
 
-### 3. Test Accounts
+---
 
-After seeding, you can register fresh accounts or use the OTP bypass code `1234` for phone-based login.
+### 3. Admin Web Portal Setup (`admin-web`)
+
+```bash
+# Navigate to admin-web directory
+cd ../admin-web
+
+# Install dependencies
+npm install
+
+# Start Vite dev server
+npm run dev
+```
+> 🌐 Admin Portal starts on `http://localhost:5173`.
 
 ---
 
 ## 📱 App Navigation Flow
 
 ```
-┌─────────────────────────────────────────────────┐
-│              UNAUTHENTICATED                     │
-│  Onboarding Screen → Auth Screen (Login/Register)│
-└──────────────────────┬──────────────────────────┘
-                       │
-            ┌──────────┴──────────┐
-            ▼                     ▼
-   ┌─────────────────┐  ┌─────────────────┐
-   │  STUDENT TABS    │  │   OWNER TABS     │
-   │  ┌─────────────┐ │  │  ┌────────────┐  │
-   │  │ 🏠 Home     │ │  │  │ 📊 Dashboard│  │
-   │  │ 🔍 Search   │ │  │  │ 📩 Enquiries│  │
-   │  │ ❤️ Saved    │ │  │  │ 💬 Chats    │  │
-   │  │ 💬 Chats    │ │  │  │ 👤 Profile  │  │
-   │  │ 👤 Profile  │ │  │  └────────────┘  │
-   │  └─────────────┘ │  └─────────────────┘
-   │                   │
-   │  + HostelDetail   │  + AddHostel
-   │  + Compare        │  + Chat
-   │  + Chat           │  + Notifications
-   │  + Notifications  │
-   │  + ScanAndPay     │
-   │  + Receipt        │
-   │  + MyReceipts     │
-   │  + Map            │
-   └───────────────────┘
+┌────────────────────────────────────────────────────────────────────────┐
+│                          UNAUTHENTICATED                               │
+│        Splash Screen ──► Onboarding Screen ──► Auth (Login/Register)   │
+└───────────────────────────────────┬────────────────────────────────────┘
+                                    │
+                  ┌─────────────────┴─────────────────┐
+                  ▼                                   ▼
+      ┌───────────────────────┐           ┌───────────────────────┐
+      │  STUDENT TAB STACK    │           │   OWNER TAB STACK     │
+      ├───────────────────────┤           ├───────────────────────┤
+      │  🏠 Home (Discover)   │           │  📊 Pro Dashboard     │
+      │  🔍 Search & Filters  │           │  📩 Enquiries & Leads │
+      │  ❤️ Saved Wishlist    │           │  💬 Conversations     │
+      │  💬 Conversations     │           │  👤 Profile & Settings│
+      │  👤 Profile           │           └───────────┬───────────┘
+      └───────────┬───────────┘                       │
+                  │                                   │
+                  ├► Roommate Finder                  ├► Add / Edit Listing
+                  ├► Compare Hostels                  ├► Tenant Manager
+                  ├► Detailed Hostel View             └► Per-Hostel Analytics
+                  ├► Interactive Map
+                  ├► Scan & Pay QR
+                  ├► Rent Due Manager
+                  ├► Digital Receipts
+                  └► Socket.IO Chat
 ```
 
 ---
 
-## 🤖 AI Recommendation Engine
+## 🔒 Security Highlights
 
-The recommendation engine scores each hostel based on:
-
-| Factor | Max Points | Logic |
-|---|---|---|
-| Premium listing | +30 | Boosted visibility for paying owners |
-| Verified listing | +20 | Trust signal |
-| Rating score | +25 | `rating × 5` points |
-| Review count | +10 | `min(reviewCount × 2, 10)` |
-| Popularity (views) | +15 | `min(viewCount / 10, 15)` |
-| Budget match | +25 | Full match if rent ≤ budget, +10 if within 120% |
-| Gender preference | +15 | Match user's gender preference |
-| Food preference | +15 | Match if user requires food & hostel provides it |
-| Amenity overlap | +5 each | Per matching amenity between user prefs & hostel |
-
-Returns the **top 10** highest-scored hostels, personalized when user is authenticated.
+*   **HTTP Protection**: Secured via Helmet headers preventing clickjacking, MIME-sniffing, and XSS attacks.
+*   **Password Security**: Hashed using BCrypt.js with 10 salt rounds and whitespace trimming.
+*   **Stateless Auth**: 30-day JWT signature verification.
+*   **Role Enforcement**: Route-level access control restricting owner/student endpoints.
+*   **UTR Fraud Shield**: Unique UTR index with 1-year TTL auto-expiry preventing double-claiming of rent payments.
+*   **Safe File Uploads**: Image-only MIME type verification (JPEG, PNG, WebP) with strict 5MB size limits.
 
 ---
 
-## 🔒 Security
+## 🗺️ Product Expansion Roadmap
 
-- **Helmet.js** for HTTP security headers
-- **BCrypt** password hashing (10 salt rounds) with input trimming
-- **JWT** tokens with 30-day expiry
-- **Role-based middleware** (`protect` + `authorize`) on all sensitive routes
-- **Ownership verification** on hostel updates/deletes
-- **File upload validation** — image-only filter (JPEG, PNG, WebP), 5MB limit
-- **UTR deduplication** — prevents payment screenshot reuse
-- **Input validation** via Express Validator on registration/login
-
----
-
-## 👥 Founding Team
-
-*   **Co-founder (Business)**: Hostel owner onboarding, student outreach, marketing, operations.
-*   **Co-founder (Technical)**: App development, backend, deployment, tech decisions.
+- [x] Student Discovery & AI Recommendation Engine
+- [x] Roommate Matching Matrix Screen
+- [x] Real-time Socket.IO Chat with Typing Status
+- [x] OCR Rent Screenshot UTR Extraction
+- [x] Side-by-Side Hostel Comparison Matrix
+- [x] Admin Web Management & MRR Portal
+- [ ] Firebase Push Notifications (FCM token backend ready)
+- [ ] Direct AWS S3 Cloud Storage Integration (fallback logic ready)
+- [ ] Payment Gateway Integration (Razorpay live mode)
+- [ ] Multi-Language Support (Telugu & Hindi localization)
 
 ---
 
-## 📍 Launch Market
+## 👥 Team & Acknowledgments
 
-*   **Phase 1**: Kukatpally + JNTU area, Hyderabad.
-*   **Phase 2**: Ameerpet, Dilsukhnagar, Begumpet.
-*   **Phase 3**: Vijayawada, Warangal, Tirupati (Telugu belt expansion).
-
----
-
-## 🗺️ Roadmap
-
-- [ ] Firebase Push Notifications (FCM integration — token registration already built)
-- [ ] AWS S3 cloud photo storage (fallback logic already built)
-- [ ] Razorpay/Stripe real payment gateway integration
-- [ ] Admin dashboard for listing verification
-- [ ] Multi-language support (Telugu, Hindi)
-- [ ] Roommate matching algorithm
-- [ ] In-app video tour of hostels
+*   **Business Operations**: Hostel owner onboarding, university outreach, marketing, and market growth.
+*   **Technical Engineering**: Full-stack application architecture, React Native mobile apps, Node.js backend & web portals.
 
 ---
 
@@ -503,4 +519,4 @@ This project is proprietary. All rights reserved.
 
 ---
 
-*Built with ❤️ in Hyderabad — for every student who ever dragged a suitcase through an unfamiliar city.*
+*Built with ❤️ in Hyderabad — empowering every student to find a safe, affordable, and comfortable home away from home.*

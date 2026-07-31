@@ -69,6 +69,7 @@ const EXPENSE_CATEGORIES = [
   const [expenses, setExpenses] = useState([]);
   const [newExpenseAmt, setNewExpenseAmt] = useState('');
   const [expenseMonth, setExpenseMonth] = useState('May 2024');
+  const [newExpenseCat, setNewExpenseCat] = useState(EXPENSE_CATEGORIES[0]);
 
   // Emergency SOS Handlers
   const handleSOSCall = (number) => {

@@ -10,7 +10,7 @@ import { Platform } from 'react-native';
  *
  * ⚠️ If your Wi-Fi IP changes, update PHYSICAL_DEVICE_IP below.
  */
-const PHYSICAL_DEVICE_IP = '192.168.1.37'; // ← Your PC's Wi-Fi IP
+const PHYSICAL_DEVICE_IP = '192.168.1.57'; // ← Your PC's Wi-Fi IP
 const EMULATOR_HOST = '10.0.2.2';
 
 // Since you are testing on a physical Android device, you MUST use your PC's Wi-Fi IP address.

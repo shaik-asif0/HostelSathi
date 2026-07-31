@@ -1,6 +1,6 @@
 import { io } from 'socket.io-client';
 
-const PHYSICAL_DEVICE_IP = '192.168.1.35';
+const PHYSICAL_DEVICE_IP = '192.168.1.57';
 const SOCKET_URL = `http://${PHYSICAL_DEVICE_IP}:5000`;
 
 let socket = null;
